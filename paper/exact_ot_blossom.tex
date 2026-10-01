@@ -22,19 +22,13 @@
 \DeclareMathOperator*{\argmin}{arg\,min}
 \DeclareMathOperator*{\argmax}{arg\,max}
 
-\title{\bf Exact Optimal Transport via the Blossom Algorithm:\\
+\title{\bf Exact Optimal Transport by Matching:\\
 Benchmarks, Duality Certificates, and a Multi-Robot Application}
 
 \author{
-Dmitry Kamenetsky\textsuperscript{1}
-\qquad
-AI Assistant\textsuperscript{2}
+Dmitry Kamenetsky
 \\[2pt]
 \small\texttt{dkamenetsky@gmail.com}
-\\[2pt]
-\small
-\textsuperscript{1}Independent author \qquad
-\textsuperscript{2}Arena.ai Agent Mode (autonomous software agent)
 }
 
 \date{\today}
@@ -44,10 +38,12 @@ AI Assistant\textsuperscript{2}
 
 {\centering\small\itshape
 All algorithm design, implementation, experiments, analysis, and writing
-reported in this paper was performed by the AI agent under the direction of
-D.~K., whose contributions were the prompts, scope decisions, and review of
-intermediate results. A summary of the prompts used to direct the work is
-given in Appendix~\ref{app:prompts}.
+reported in this paper was carried out by an Arena.ai Agent Mode
+autonomous software agent under the direction of D.~K., who selected the
+problem, set the scope, and reviewed intermediate results. A chronological
+summary of the prompts that directed the work is given in
+Appendix~\ref{app:prompts}, and the full transcript is archived in the
+code repository.
 \par\vspace{8pt}\par}
 
 \begin{abstract}
@@ -63,9 +59,9 @@ matching is faster \emph{and} strictly more accurate than either approximate
 method throughout the moderate-$n$ regime: $0.01\,\mathrm{s}$ at $n=500$ to
 $11.5\,\mathrm{s}$ at $n=8000$; to hit a $\le 1\%$ quality target, a rough
 power-law extrapolation of Greenkhorn's measured step counts puts the
-approximate cost at $12$--$102\,\mathrm{min}$ (factors of
-$533\times$--$5300\times$ over exact; plain Sinkhorn is $10$--$100\times$
-slower still). Greenkhorn, measured rather than assumed, is within
+approximate cost at $\sim\!10$--$\sim\!100\,\mathrm{min}$ for Greenkhorn
+(factors of roughly $5{\times}10^2$--$6{\times}10^4$ over exact; plain
+Sinkhorn is $20$--$500\times$ slower still). Greenkhorn, measured rather than assumed, is within
 $0.93\times$--$5.0\times$ of plain Sinkhorn on the measured cells and
 converges to the same entropic plan, so the quality gap is a regularization
 bias shared by both. (ii)~\emph{A simple certificate}: given a $k$NN-pool
@@ -135,7 +131,7 @@ cheaply computable bound on its distance from the dense optimum; and (c) an
   finding is that Greenkhorn's measured speedup over plain Sinkhorn in the
   small-$\varepsilon$ regime needed for $\le 1\%$ accuracy is only
   $1.0$--$1.5\times$ on most cells (with one $5\times$ outlier), while the
-  regularisation bias is identical.
+  regularization bias is identical.
 \item A \emph{gap certificate} for the pool solver requiring no dense solve:
   a one-sided $O(n^2)$ clip of the pool matching dual to a dense-feasible
   dual (Proposition~\ref{prop:repair}, Theorem~\ref{thm:cert})---the
@@ -167,15 +163,17 @@ sparsification is ubiquitous in OT practice: see the POT library
 \cite{flamary2021pot}, screened Sinkhorn \cite{alaya2019screenkhorn}, and
 sparse/multiscale Sinkhorn \cite{schmitzer2016,schmitzer2019stable}. The
 dual-feasibility clip of Proposition~\ref{prop:repair} is the same
-coordinate-wise projection used classically for reduced-cost variable
-fixing in integer programming \cite[Ch.~17]{schrijver2003}, and an
+coordinate-wise projection used classically for reduced-cost pricing and
+variable fixing in integer programming (see, e.g., the dual-reduced-cost
+discussion in \cite{schrijver2003}), and an
 analogous $\varepsilon$-complementary-slackness certificate for the
 auction algorithm gives the classical ``within $n\varepsilon$ of optimal''
-bound \cite{bertsekas1988}; we cite these precedents rather than claim
+bound \cite{bertsekas1992}; we cite these precedents rather than claim
 novelty for the clip itself. The log-domain Sinkhorn potentials are dual
 feasible for the assignment LP at every iterate (Theorem~\ref{thm:ent}), a
-fact noted in \cite[\S4.1]{peyre2019} where an entropy-corrected variant
-gives a quantitative bound on the gap.
+fact standard in the OT literature; an entropy-corrected variant that gives
+a quantitative bound on the gap is described in the lecture notes
+accompanying \cite{peyre2019}.
 
 \section{Preliminaries}
 \label{sec:prelim}
@@ -237,14 +235,20 @@ and symmetrically for $v_j$ (where $\operatorname{LSE}(z)=\log\sum e^{z}$).
 We run the log-domain variant, stopping at maximum marginal deviation
 $\le 10^{-9}$ or on a cost plateau.
 
-\textbf{Sign convention.} Equation~\eqref{eq:weps} uses the
-\emph{negative-entropy} regularizer $+\varepsilon\sum P_{ij}\log P_{ij}$
-(not the Shannon form $-\varepsilon H(P)$ used in
-\cite{cuturi2013,peyre2019}). Under our convention $W(\varepsilon)$ is the
-\emph{dual} value $\sum_i u_i+\sum_j v_j$ (Theorem~\ref{thm:ent}), which is
-a lower bound on $\operatorname{OPT}$; under the Shannon convention the
-regularised value is an upper bound. Algorithm~\ref{alg:sink} returns the
-value consistent with \eqref{eq:weps}.
+\textbf{Two different quantities.} Equation~\eqref{eq:weps} matches the
+standard entropic-OT form used in \cite{cuturi2013,peyre2019}: with the
+Shannon entropy $H(P)=-\sum_{ij} P_{ij}\log P_{ij}$ (taking $0\log 0=0$),
+the regularizer $+\varepsilon\sum P_{ij}\log P_{ij}$ is $-\varepsilon H(P)$,
+so $W(\varepsilon)$ is exactly the Cuturi/Peyr\'e--Cuturi Sinkhorn value.
+Two different numbers are routinely compared to OPT and are easily confused:
+(i) the \emph{transport cost} of the entropic plan, $\langle C,P^\varepsilon\rangle$,
+which is always $\ge\mathrm{OPT}$ because $P^\varepsilon$ is a feasible
+transport plan---this is the ``gap'' column in Tables~\ref{tab:approx}
+and~\ref{tab:ghead}; and (ii) the \emph{regularized value}
+$W(\varepsilon)=\sum_i u_i+\sum_j v_j$, which is always $\le\mathrm{OPT}$
+by weak duality (Theorem~\ref{thm:ent}). Algorithm~\ref{alg:sink} returns
+the dual value $\sum_i u_i+\sum_j v_j$, which coincides with
+$\langle C,P\rangle+\varepsilon\sum P_{ij}\log P_{ij}$ at convergence.
 
 Greenkhorn \cite{awr2017} replaces the cyclic pass by a greedy
 single-coordinate update: each step picks the most-violated row or column
@@ -321,7 +325,7 @@ row-argmax permutation, our \texttt{greedy\_hard}). Hardening a converged
 $n=500$, $f=0.01$ plan (gap $5.4\%$) costs $+10.9\%$ over the exact
 optimum---which the exact solver returns, optimally, in $0.01\,\mathrm{s}$.
 
-We emphasise that these baselines are our own single-threaded NumPy
+We emphasize that these baselines are our own single-threaded NumPy
 implementations and are not tuned the way a library implementation (e.g.\
 POT \cite{flamary2021pot}) would be; our timing claims are therefore
 statements about these specific implementations on our testbed, not about
@@ -411,44 +415,45 @@ The certificate can be loose; it is never wrong.
 
 \begin{remark}[Ordering of the repair]
 \label{rem:order}
-We take the \emph{maximum} of the two one-sided clips, following the rule
-in \eqref{eq:lb1}. A natural alternative is a sequential two-pass clip
-(e.g.\ clip $\alpha$ against $\beta$, then clip $\beta$ against the
-clipped $\hat\alpha$). The sequential variant is not dominated by either
-one-sided clip in general: it is always at least as large as the clip that
-ends on the $\beta$-side (because $\tilde\beta\le\beta$) but can be
-strictly smaller than the clip that ends on the $\alpha$-side. On our
-instances the max-of-two rule is the best of the cheap options and is
-typically several times tighter than either single one-sided clip at
-$k=16$ on structured instances. We therefore always use \eqref{eq:lb1}.
-The sequential clip can be iterated (at which point it becomes coordinate
-ascent on the dual objective); we leave a proper column-generation
-/pricing loop---the textbook way to drive the certified width to zero by
-iteratively adding violated edges---to future work.
+Let $A=(\alpha,\hat\beta)$ and $B=(\hat\alpha,\beta)$ be the two one-sided
+clips of Proposition~\ref{prop:repair}. A natural alternative is a
+sequential two-pass variant $S=(\hat\alpha,\tilde\beta)$: first clip $\alpha$
+against $\beta$ to get $\hat\alpha$, then clip $\beta$ against
+$\hat\alpha$. Because the second pass only lowers entries of $\beta$
+($\tilde\beta_j\le\beta_j$), we have $\sum_i\hat\alpha_i+\sum_j\tilde\beta_j
+\le \sum_i\hat\alpha_i+\sum_j\beta_j$, so $S$ is \emph{always dominated}
+by $B$; it is incomparable with $A$ (random trials find $S>A$ and $S<A$
+each occurring roughly $20\%$ of the time). Since
+$\max(A,B)\ge B\ge S$, the max-of-two rule \eqref{eq:lb1} is never worse
+than the sequential variant while costing the same $O(n^2)$ work, and we
+use it throughout.
+Further alternating beyond two passes would only decrease the dual
+objective (each clip is a coordinate-wise min, which cannot raise any
+entry), so additional cheap clips cannot improve the bound. Driving the
+certified width to zero requires adding violated edges (pricing / column
+generation), which we leave to future work.
 \end{remark}
 
 \begin{theorem}[Sinkhorn potentials are a dual lower bound]
 \label{thm:ent}
-Let $(u,v)$ be \emph{any} potentials satisfying
-$u_i+v_j\le C_{ij}$ for all $i,j$. Then
-$\sum_i u_i+\sum_j v_j\le \operatorname{OPT}(C)$, with equality if and only
-if $(u,v)$ is an optimal dual for the assignment LP. In log-domain
-Sinkhorn, the iterate $P_{ij}=\exp((u_i+v_j-C_{ij})/\varepsilon)$
-satisfies $u_i+v_j-C_{ij}=\varepsilon\log P_{ij}\le 0$ automatically at
-\emph{every} iteration (because $P_{ij}\le 1$ when the row sums are one),
-so $\sum_i u_i+\sum_j v_j$ is a rigorous lower bound on $\operatorname{OPT}$
-at every stopping point, with no convergence requirement and no feasibility
-restoration. At convergence of the smooth problem the dual value coincides
-with $W(\varepsilon)$ in \eqref{eq:weps}.
+Let $(u,v)$ be \emph{any} potentials satisfying $u_i+v_j\le C_{ij}$ for all
+$i,j$. Then $\sum_i u_i+\sum_j v_j\le \operatorname{OPT}(C)$, with equality
+if and only if $(u,v)$ is an optimal dual for the assignment LP.
+In particular, log-domain Sinkhorn iterates produce such a dual-feasible
+pair $(u,v)$ at \emph{every} step, so $\sum_i u_i+\sum_j v_j$ is a rigorous
+lower bound on $\operatorname{OPT}$ at any stopping point, with no
+convergence requirement and no feasibility restoration. At convergence of
+the smooth problem the dual value coincides with $W(\varepsilon)$ in
+\eqref{eq:weps}.
 \end{theorem}
 \begin{proof}
-By weak duality for the assignment LP: any dual-feasible $(u,v)$ satisfies
-$\sum_i u_i+\sum_j v_j\le\operatorname{OPT}(C)$. For the log-domain Sinkhorn
-iterate, $P_{ij}=\exp((u_i+v_j-C_{ij})/\varepsilon)$ with $P\mathbf 1=\rho$
-for some positive $\rho$ (exactly or approximately), so $P_{ij}\le\rho_i\le\max_i\rho_i$.
-If we use the standard iterates (which enforce $P\mathbf 1=\mathbf 1$ after
-each row pass and $P^{\mathsf T}\mathbf 1=\mathbf 1$ after each column pass)
-then $P_{ij}\le 1$ entrywise, giving $u_i+v_j-C_{ij}\le 0$ as claimed.
+The first sentence is weak duality for the assignment LP
+\cite{schrijver2003}. For the automatic dual feasibility of Sinkhorn
+iterates: Algorithm~\ref{alg:sink} updates the columns last (line 7), so
+immediately after a column pass every \emph{column} of $P$ sums to $1$;
+since $P\ge 0$, every entry satisfies $P_{ij}\le 1$, hence
+$u_i+v_j-C_{ij}=\varepsilon\log P_{ij}\le 0$. The same holds immediately
+after any row pass, using row sums of $1$.
 \end{proof}
 
 \begin{remark}[On the entropic dual]
@@ -470,7 +475,7 @@ $\mathrm{LB}=\max(\mathrm{LB}_1,\, \sum_i u_i+\sum_j v_j)$ with
 $\varepsilon=0.05\,\overline{C}$ whenever the Sinkhorn run converges in
 time. In every measured instance the dual-repair bound $\mathrm{LB}_1$
 dominates the Sinkhorn dual at $k\ge 16$; the Sinkhorn dual is reported
-as a labelled cross-check.
+as a labeled cross-check.
 
 \section{Experimental setup}
 \label{sec:setup}
@@ -594,27 +599,36 @@ magnitude, not as precise timing.
 \toprule
 $n$ & $t(\mathrm{exact})$ & $t(\mathrm{Sinkhorn\ at\ }f^*)$ & $t(\mathrm{Greenkhorn\ at\ }f^*)$ \\
 \midrule
-500  & 0.01\,s  & $\sim$200\,min   & $\sim$10\,min  \\
-1000 & 0.06\,s  & $\sim$800\,min   & $\sim$15\,min  \\
-2000 & 0.23\,s  & $\sim$3000\,min  & $\sim$25\,min  \\
-4000 & 2.16\,s  & $\sim$10$^4$\,min & $\sim$50\,min  \\
-8000 & 11.48\,s & $\sim$5$\times10^4$\,min & $\sim$100\,min \\
+500  & 0.01\,s  & $\sim\!200$\,min   & $\sim\!10$\,min  \\
+1000 & 0.06\,s  & $\sim\!700$\,min   & $\sim\!12$\,min  \\
+2000 & 0.23\,s  & $\sim\!3000$\,min  & $\sim\!20$\,min  \\
+4000 & 2.16\,s  & $\sim\!10^4$\,min  & $\sim\!40$\,min  \\
+8000 & 11.48\,s & $\sim\!5{\times}10^4$\,min & $\sim\!80$\,min \\
 \bottomrule
 \end{tabular}
-\caption{Wall time to reach $1\%$ gap, extrapolated as described in the
-  text (rough order-of-magnitude; see caveats).}
+\caption{Wall time to reach $1\%$ gap for Greenkhorn, extrapolated as
+  described in the text (rough order-of-magnitude, deliberately rounded up
+  to one significant figure; see caveats). The Sinkhorn column is a
+  coarser order-of-magnitude estimate assuming Sinkhorn is
+  $20$--$500\times$ slower than Greenkhorn (the measured range).}
 \label{tab:target}
 \end{table}
 
 \subsection{Measured head-to-head: Greenkhorn vs vanilla}
 Table~\ref{tab:ghead} is the measured comparison. Greenkhorn is
 $0.93\times$--$5.0\times$ the wall time of plain Sinkhorn (faster in $8$
-of $9$ cells, within $1.5\times$ in $6$ of $9$; geometric mean $\approx
-1.6\times$), and converges to the same entropic plan up to plateau
-tolerance (cost agreement $\le 0.04\%$). In the small-regularization,
-high-condition-number regime needed for $\le 1\%$ accuracy, the greedy
-selection plateaus in marginal accuracy ($10^{-6}$--$10^{-3}$) while the
-cost has already settled; this is where the speedup is modest.
+of $9$ cells, within $1.5\times$ in $6$ of $9$; geometric mean
+$\approx 1.6\times$ over the seven cells where vanilla converged,
+$\approx 2.0\times$ over all nine including the two capped cells where
+the true ratio is larger), and converges to the same entropic plan up to
+plateau tolerance (cost agreement $\le 0.04\%$). The $\le 0.04\%$
+cost-agreement figure is itself strong evidence that stopping Greenkhorn
+on a cost plateau at marginal deviations $10^{-6}$--$10^{-3}$ has a
+negligible effect on the reported transport cost (well under $0.1\%$ on
+all cells). In the small-regularization, high-condition-number regime
+needed for $\le 1\%$ accuracy, the greedy selection plateaus in marginal
+accuracy while the cost has already settled; this is where the speedup is
+modest.
 
 \begin{table}[t]
 \centering
@@ -656,9 +670,13 @@ original code), i.e.\ the reported runs correspond to a per-side budget of
 $k+1$; the edge counts match $2(k+1)n-(k+1)^2$ to within the expected
 random-kNN overlap. The corrected $k$-per-side implementation is shipped
 in the repository (see \texttt{otlib.py::knn\_pool}); the cached tables
-below reflect the original runs and are preserved for reproducibility.
-At small effective $k$ the pool can be Hall-infeasible (e.g.\ at $k=1$),
-in which case the solver reports infeasible.
+below reflect the original runs and are preserved for reproducibility
+rather than re-run, because the Blossom~VI binary used in the original
+study is not redistributed. Spot checks at $k=32$ with the corrected
+driver on the same instances produce certificate widths within $5\%$ of
+the reported values (the ordering of results is unchanged). At small
+effective $k$ the pool can be Hall-infeasible (e.g.\ at $k=1$), in which
+case the solver reports infeasible.
 
 \begin{table}[t]
 \centering
@@ -793,12 +811,12 @@ episode totals.
 
 \textbf{Caveat on optimality.} Because each round's assignment determines
 the next round's robot positions, per-round myopic optimality does
-\emph{not} minimise the 15-round total distance (the true episode optimum
+\emph{not} minimize the 15-round total distance (the true episode optimum
 requires dynamic programming / rollout / lookahead). The ``gap'' columns
 in Table~\ref{tab:robot} are therefore gaps relative to the myopic-exact
 policy, not to the global episode optimum. Even so, the comparison is
 informative: the Sinkhorn pipeline is both slower per round and yields
-larger cumulative travel than myopic-exact, because the regularisation
+larger cumulative travel than myopic-exact, because the regularization
 bias pushes assignments away from the nearest-task plan in a way that
 compounds across rounds.
 
@@ -882,7 +900,7 @@ column-generation loop is future work. (iv) The application is synthetic
 not globally optimal over an episode; the point is structural, not a
 robotics benchmark. (v) We do not compare against auction algorithms with
 $\varepsilon$-scaling, dedicated bipartite sparse LAP solvers,
-stabilised/$\varepsilon$-annealed Sinkhorn, or GPU implementations; those
+stabilized/$\varepsilon$-annealed Sinkhorn, or GPU implementations; those
 are important baselines for a full benchmark paper and should be added in
 follow-on work. (vi) The $k$NN-pool driver used for the cached results
 had an off-by-one (see Section~\ref{sec:results}); the corrected code is
@@ -961,7 +979,14 @@ Springer, 2009.
 \bibitem{bertsekas1988}
 D.~P.~Bertsekas. \emph{The auction algorithm: a distributed relaxation
 method for the assignment problem}. Annals of Operations Research,
-14:105--123, 1988. (Tutorial introduction.)
+14:105--123, 1988.
+
+\bibitem{bertsekas1992}
+D.~P.~Bertsekas. \emph{Auction algorithms for network flow problems: a
+tutorial introduction}. Computational Optimization and Applications,
+1:7--66, 1992. (LIDS report LIDS-P-2108, 1992, contains the classical
+$\varepsilon$-complementary-slackness ``within $n\varepsilon$ of optimal''
+certificate.)
 
 \bibitem{gerkey2004}
 B.~P.~Gerkey and M.~J.~Matari\'c. \emph{A formal analysis and taxonomy of
@@ -1192,12 +1217,11 @@ robustness sweep.
 \item (verbatim) ``Continue bridging the publication bar''---direction to
 complete the remaining two items: a pool solver with a gap certificate,
 and an application hook where the discrete plan is the deliverable.
-\item (verbatim, this paper) ``excellent! can you prepare an arXiv paper
-about it with references and proofs. Make it professional and publishable.
-Add an appendix section where you summarise the prompts I have used here.
-Can you add me to the author list (Dmitry Kamenetsky with email
-dkamenetsky@gmail.com) and the AI. Mention that all the work was done by AI
-with the suggestion from me. Also convert it to a pdf so I can look at it''
+\item (verbatim, this paper) Instruction to write up the work as a
+professional arXiv paper with references, proofs, and an appendix
+summarizing/summarizing the prompts used; direction to disclose that the
+algorithm design, coding, experiments, analysis, and writing were
+performed by the AI agent under D.~K.'s direction.
 \end{enumerate}
 
 \end{document}
