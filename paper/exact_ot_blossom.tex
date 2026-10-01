@@ -1,5 +1,6 @@
 \documentclass[11pt]{article}
 \usepackage[T1]{fontenc}
+\usepackage{lmodern}
 \usepackage[margin=1in]{geometry}
 \emergencystretch=2em
 \usepackage{amsmath,amssymb,amsthm}
@@ -18,13 +19,22 @@
 \theoremstyle{remark}
 \newtheorem{remark}{Remark}
 
+\DeclareMathOperator*{\argmin}{arg\,min}
+\DeclareMathOperator*{\argmax}{arg\,max}
+
 \title{\bf Exact Optimal Transport via the Blossom Algorithm:\\
 Benchmarks, Duality Certificates, and a Multi-Robot Application}
 
 \author{
-Dmitry Kamenetsky\quad\textit{and}\quad AI Assistant\\
-\small{\texttt{dkamenetsky@gmail.com}} \qquad
-\small{Arena.ai Agent Mode (autonomous software agent)}
+Dmitry Kamenetsky\textsuperscript{1}
+\qquad
+AI Assistant\textsuperscript{2}
+\\[2pt]
+\small\texttt{dkamenetsky@gmail.com}
+\\[2pt]
+\small
+\textsuperscript{1}Independent author \qquad
+\textsuperscript{2}Arena.ai Agent Mode (autonomous software agent)
 }
 
 \date{\today}
@@ -33,44 +43,43 @@ Dmitry Kamenetsky\quad\textit{and}\quad AI Assistant\\
 \maketitle
 
 {\centering\small\itshape
-All of the work reported in this paper---algorithm design, implementation,
-experiments, analysis, and writing---was performed by the AI agent under the
-direction of D.~K., whose contributions were the prompts, scope decisions,
-and review of intermediate results. A summary of the prompts used to direct
-the work is given in Appendix~\ref{app:prompts}.
+All algorithm design, implementation, experiments, analysis, and writing
+reported in this paper was performed by the AI agent under the direction of
+D.~K., whose contributions were the prompts, scope decisions, and review of
+intermediate results. A summary of the prompts used to direct the work is
+given in Appendix~\ref{app:prompts}.
 \par\vspace{8pt}\par}
 
 \begin{abstract}
 Balanced discrete optimal transport between $n$ sources and $n$ targets of
-unit mass is, exactly, the minimum-cost assignment problem, i.e.\ a
-bipartite perfect matching---so it is solvable \emph{exactly} with the
-industrial Blossom engine in milliseconds to seconds. We study when this
-exact approach beats the standard approximate alternatives, entropic
-Sinkhorn iteration and its state-of-the-art accelerated variant Greenkhorn,
-and we make the sparse-exact side \emph{certified}. Three contributions.
-(i)~\emph{Measurement}: on dense 2-D instances, exact matching is faster
-\emph{and} strictly more accurate than either approximate method throughout
-the moderate-$n$ regime: $0.01\,\mathrm{s}$ at $n=500$ to $11.5\,\mathrm{s}$
-at $n=8000$, where reaching the same $\le 1\%$ quality target takes the
-approximate baselines $12$--$102\,\mathrm{min}$ by measurement-based
-extrapolation (factors of $533$--$72{,}000\times$). Greenkhorn, measured
-rather than assumed, is $1.0$--$5.0\times$ faster than plain Sinkhorn and
-converges to the identical entropic plan, so the quality gap is a
-regularization bias shared by both. (ii)~\emph{Theory}: a rigorous gap
-certificate for the $k$NN-pool solver that never solves the dense problem:
-the pool matching dual returned by Blossom is repaired to dense feasibility
-in one $O(n^2)$ pass, yielding a lower bound (Proposition~\ref{prop:repair},
-Theorem~\ref{thm:cert}); an entropic dual value provides a second floor
-(Theorem~\ref{thm:ent}). On 15 instance families and $k\in\{16,32,64\}$ the
-certificate invariants hold on $45/45$ cells; the certified width is
-$\le 0.70\%$ at $k=32$ on uniform instances (true gap $\le 0.13\%$) and
-tightens monotonically in $k$ on every family. (iii)~\emph{Application}:
-multi-robot task allocation, where the discrete plan itself is the
-deliverable: per-round exact assignment costs $0.1$--$68\,\mathrm{ms}$,
-while a Sinkhorn-plus-hardening pipeline costs $0.12$--$15.9\,\mathrm{s}$
-\emph{and} compounds to $+6$--$37\%$ in total travel distance. The
-Sinkhorn family's genuine regime---large dense instances beyond the memory
-wall---is acknowledged and left untouched.
+unit mass is exactly the minimum-cost assignment problem, i.e.\ a bipartite
+perfect matching, and can therefore be solved \emph{exactly} by industrial
+matching engines in milliseconds to seconds. We ask when this exact approach
+beats the standard approximate alternatives---entropic Sinkhorn and its
+state-of-the-art accelerated variant Greenkhorn---and make the sparse-exact
+side \emph{certified} by a standard dual-feasibility clip. Three
+contributions. (i)~\emph{Measurement}: on dense 2-D instances, exact
+matching is faster \emph{and} strictly more accurate than either approximate
+method throughout the moderate-$n$ regime: $0.01\,\mathrm{s}$ at $n=500$ to
+$11.5\,\mathrm{s}$ at $n=8000$; to hit a $\le 1\%$ quality target, a rough
+power-law extrapolation of Greenkhorn's measured step counts puts the
+approximate cost at $12$--$102\,\mathrm{min}$ (factors of
+$533\times$--$5300\times$ over exact; plain Sinkhorn is $10$--$100\times$
+slower still). Greenkhorn, measured rather than assumed, is within
+$0.93\times$--$5.0\times$ of plain Sinkhorn on the measured cells and
+converges to the same entropic plan, so the quality gap is a regularization
+bias shared by both. (ii)~\emph{A simple certificate}: given a $k$NN-pool
+matching and its Blossom dual, a one-pass clipping of the dual to dense
+feasibility gives a valid lower bound (the textbook LP dual-feasibility
+argument); combined with the Sinkhorn dual potential $\sum_i u_i+\sum_j
+v_j$ (which is a lower bound at \emph{every} iterate, not just at
+convergence), the bound is checked on 15 instance families at three pool
+sizes. (iii)~\emph{Application}: multi-robot task allocation, where the
+discrete plan itself is the deliverable: per-round myopic-exact assignment
+costs $0.1$--$68\,\mathrm{ms}$, while a Sinkhorn-plus-hardening pipeline
+costs $0.12$--$15.9\,\mathrm{s}$ and accumulates $+6$--$27\%$ extra travel
+distance over 15 rounds. The Sinkhorn family's genuine regime---large dense
+instances beyond the memory wall---is acknowledged and left untouched.
 \end{abstract}
 
 \section{Introduction}
@@ -81,7 +90,7 @@ statistics, imaging, and robotics \cite{peyre2019, survey2025}. The scalable
 default for large instances is entropic regularization \cite{cuturi2013}:
 the smooth problem is solved by the Sinkhorn iteration
 \cite{sinkknopp1967}, and---for speed---by accelerated coordinate variants
-such as Greenkhorn \cite{awr2017}. Two structural facts are often
+such as Greenkhorn \cite{awr2017,lin2022}. Two structural facts are often
 underappreciated in the approximate-OT literature.
 
 \begin{enumerate}[leftmargin=2em,itemsep=1pt]
@@ -93,10 +102,13 @@ therefore a bipartite minimum-weight perfect matching---a special case of
 the classical assignment problem \cite{schrijver2003}, solvable exactly by
 shortest-augmenting-path methods \cite{jonker1987} and, in its general
 (non-bipartite) form, by Edmonds' Blossom algorithm \cite{edmonds1965} as
-implemented in the production engines Blossom~V~\cite{blossomv} and
-VI~\cite{blossomvi}. Blossom~VI subsumes the bipartite case and is used here
-because the same edge-list driver handles arbitrary sparse matchings; exact
-solvers return the \emph{optimal integer plan} and its exact value.
+implemented in Blossom~V~\cite{blossomv} and VI~\cite{blossomvi}. Exact
+solvers return the \emph{optimal integer plan} and its exact value. (Bipartite
+matching is a strict special case of general matching, so Blossom applies
+directly, but dedicated bipartite solvers such as Jonker--Volgenant or
+shortest-augmenting-path are typically faster on dense bipartite inputs; we
+use Blossom~VI for the sparse $k$NN-pool experiments and SciPy's
+Jonker--Volgenant routine for dense solves.)
 \item \textbf{Exact matching is fast.} On the 2-core/2-GB testbed of this
 study, dense exact assignment takes $0.01\,\mathrm{s}$ at $n=500$ and
 $11.5\,\mathrm{s}$ at $n=8000$; exploiting local structure, a $k$NN-pool
@@ -106,58 +118,64 @@ the dense optimum; 1-D instances reach $n=10^6$ in $0.11\,\mathrm{s}$.
 
 The question this paper answers is empirical: \emph{when does exact
 matching beat approximate OT?} We answer with (a) a measurement study in
-which the approximate baselines---including the state-of-the-art
-Greenkhorn---are \emph{implemented and measured, not assumed}; (b) a
-\emph{duality certificate} for the pool solver, so that a sparse solution
-comes with a rigorous, cheaply computable bound on its distance from the
-dense optimum; and (c) an \emph{application hook} in which the discrete
-plan is the deliverable (multi-robot task allocation), showing that there
-approximation is a tax on both time and quality.
+which the approximate baselines---including Greenkhorn---are \emph{implemented
+and measured, not assumed}; (b) a \emph{dual-feasibility certificate} for
+the $k$NN-pool solver, so that a sparse solution comes with a rigorous,
+cheaply computable bound on its distance from the dense optimum; and (c) an
+\emph{application hook} in which the discrete plan is the deliverable
+(multi-robot task allocation).
 
 \paragraph{Contributions.}
 \begin{enumerate}[leftmargin=2em,itemsep=1pt]
-\item A measured comparison of exact matching (dense LAPJV-style Jonker--Volgenant,
-  sparse Blossom~VI pool, 1-D closed form) against vanilla Sinkhorn and
-  Greenkhorn on dense, clustered, and 1-D+noise instances,
+\item A measured comparison of exact matching (dense Jonker--Volgenant,
+  sparse Blossom~VI $k$NN pool, 1-D closed form) against vanilla Sinkhorn
+  and Greenkhorn on dense, clustered, and 1-D+noise instances,
   $n\in\{500,\dots,8000\}$, multiple seeds and distributions
-  (Sections~\ref{sec:setup}--\ref{sec:results}).
-\item A rigorous \emph{gap certificate} for the pool solver requiring no
-  dense solve: a one-sided $O(n^2)$ repair of the pool matching dual to a
-  dense-feasible dual (Proposition~\ref{prop:repair},
-  Theorem~\ref{thm:cert}), combined with an entropic dual floor
-  (Theorem~\ref{thm:ent}). Valid on $45/45$ measured cells;
-  $\le 0.70\%$ certified width at $k=32$ on uniform instances; monotone in
-  $k$ on every instance (Section~\ref{sec:cert}, Section~\ref{sec:results}).
-  The repair is the same clipping operation used for reduced-cost filtering
-  in integer programming, but applied here as a stand-alone certificate for
-  a $k$NN-pool OT solve; its empirical behaviour is documented across
-  families.
-\item A multi-robot task-allocation study quantifying the ``discrete plan is
-  the deliverable'' regime: exact is millisecond-fast; the approximate
-  pipeline is $100$--$240\times$ slower per round and $+6$--$37\%$ worse in
-  travel distance (Section~\ref{sec:app}).
-\item All code, data, and results are open artifacts under an MIT license
+  (Sections~\ref{sec:setup}--\ref{sec:results}). The headline empirical
+  finding is that Greenkhorn's measured speedup over plain Sinkhorn in the
+  small-$\varepsilon$ regime needed for $\le 1\%$ accuracy is only
+  $1.0$--$1.5\times$ on most cells (with one $5\times$ outlier), while the
+  regularisation bias is identical.
+\item A \emph{gap certificate} for the pool solver requiring no dense solve:
+  a one-sided $O(n^2)$ clip of the pool matching dual to a dense-feasible
+  dual (Proposition~\ref{prop:repair}, Theorem~\ref{thm:cert})---the
+  textbook reduced-cost / dual-restriction operation---combined with the
+  Sinkhorn-dual potential lower bound, which holds at \emph{every} iterate
+  (Theorem~\ref{thm:ent}). The certificate is valid on all $45$ measured
+  cells and tightens monotonically in $k$ on every family
+  (Section~\ref{sec:cert}, Section~\ref{sec:results}).
+\item A multi-robot task-allocation experiment quantifying the ``discrete
+  plan is the deliverable'' regime: myopic exact assignment is millisecond
+  fast; the Sinkhorn pipeline is $10^2$--$10^3\times$ slower per round and
+  accumulates extra travel distance (Section~\ref{sec:app}).
+\item All code, data, and results are open artifacts under the MIT license
   (Appendix~\ref{app:repro}).
 \end{enumerate}
 
 \paragraph{Positioning and related work.}
 We do not claim to beat near-linear-time Sinkhorn-family variants on large
 dense instances ($n\gg 10^4$): that regime is genuinely theirs, and our
-testbed's $2\,\mathrm{GB}$ memory wall sits at $n\approx 1.2\times 10^4$
-anyway. The contribution is to \emph{measure} the boundary in the regime
-where exact is affordable, to show the state-of-the-art accelerated
-approximation does not cross that boundary (it pays the same regularization
-gap as plain Sinkhorn), and to \emph{certify} the sparse-exact alternative
-so it can be used with provable guarantees. That balanced discrete OT
-reduces to the assignment problem is textbook knowledge
-\cite{birkhoff1946,schrijver2003,villani2009,peyre2019}; $k$NN sparsification
-is a ubiquitous heuristic in OT practice (see the POT library
-\cite{flamary2021pot}, screened Sinkhorn \cite{alaya2019screenkhorn},
-sparse/multiscale Sinkhorn \cite{schmitzer2016,schmitzer2019stable}); and
-exact solvers have long been used as ground truth. Our contribution is to
-package the sparse-exact side with a cheap dual certificate and to
-benchmark the exact--approximate crossover directly on the moderate-$n$
-regime that most practitioners actually operate in.
+testbed's $2\,\mathrm{GB}$ memory wall sits near $n\approx 1.2\times 10^4$.
+The contribution is to \emph{measure} the boundary in the regime where
+exact is affordable, to show that Greenkhorn does not cross that boundary,
+and to document how tight a standard dual-feasibility clip is as a
+certificate for a sparse-$k$NN solve.
+
+That balanced discrete OT reduces to the assignment problem is textbook
+\cite{birkhoff1946,schrijver2003,villani2009,peyre2019}. $k$NN
+sparsification is ubiquitous in OT practice: see the POT library
+\cite{flamary2021pot}, screened Sinkhorn \cite{alaya2019screenkhorn}, and
+sparse/multiscale Sinkhorn \cite{schmitzer2016,schmitzer2019stable}. The
+dual-feasibility clip of Proposition~\ref{prop:repair} is the same
+coordinate-wise projection used classically for reduced-cost variable
+fixing in integer programming \cite[Ch.~17]{schrijver2003}, and an
+analogous $\varepsilon$-complementary-slackness certificate for the
+auction algorithm gives the classical ``within $n\varepsilon$ of optimal''
+bound \cite{bertsekas1988}; we cite these precedents rather than claim
+novelty for the clip itself. The log-domain Sinkhorn potentials are dual
+feasible for the assignment LP at every iterate (Theorem~\ref{thm:ent}), a
+fact noted in \cite[\S4.1]{peyre2019} where an entropy-corrected variant
+gives a quantitative bound on the gap.
 
 \section{Preliminaries}
 \label{sec:prelim}
@@ -208,53 +226,64 @@ The minimizer is the Gibbs kernel $P^{\varepsilon}_{ij}\propto
 \exp(-C_{ij}/\varepsilon)$ renormalized to have unit marginals. The
 Sinkhorn--Knopp iteration \cite{sinkknopp1967, cuturi2013} alternates row
 and column scaling of $K=\exp(-C/\varepsilon)$; in log form, with
-potentials $(u,v)$, each pass sets
-$P_{ij}=\exp\bigl((u_i+v_j-C_{ij})/\varepsilon\bigr)$ and updates
-$u_i\leftarrow u_i - \varepsilon\log(\sum_j P_{ij})$ (columns symmetrically).
+potentials $(u,v)$ such that $P_{ij}=\exp\bigl((u_i+v_j-C_{ij})/\varepsilon\bigr)$,
+each full row pass sets
+\begin{equation}
+\label{eq:sinkupdate}
+u_i \;\leftarrow\; -\varepsilon\,\operatorname{LSE}_j\Bigl(\frac{v_j-C_{ij}}{\varepsilon}\Bigr)
+\;=\; u_i-\varepsilon\log\!\sum_j P_{ij},
+\end{equation}
+and symmetrically for $v_j$ (where $\operatorname{LSE}(z)=\log\sum e^{z}$).
 We run the log-domain variant, stopping at maximum marginal deviation
 $\le 10^{-9}$ or on a cost plateau.
 
-\textbf{Sign convention.}
-Equation~\eqref{eq:weps} uses the \emph{negative-entropy} regularizer
-$+\varepsilon\sum P_{ij}\log P_{ij}$ (not the more common Shannon form
-$-\varepsilon H(P)$ used in \cite{cuturi2013,peyre2019}). Under our
-convention $W(\varepsilon)\le\operatorname{OPT}(C)$ (Theorem~\ref{thm:ent});
-under the Shannon convention the inequality reverses and $W(\varepsilon)$
-is an upper bound. Algorithm~\ref{alg:sink} returns the value consistent
-with \eqref{eq:weps}.
+\textbf{Sign convention.} Equation~\eqref{eq:weps} uses the
+\emph{negative-entropy} regularizer $+\varepsilon\sum P_{ij}\log P_{ij}$
+(not the Shannon form $-\varepsilon H(P)$ used in
+\cite{cuturi2013,peyre2019}). Under our convention $W(\varepsilon)$ is the
+\emph{dual} value $\sum_i u_i+\sum_j v_j$ (Theorem~\ref{thm:ent}), which is
+a lower bound on $\operatorname{OPT}$; under the Shannon convention the
+regularised value is an upper bound. Algorithm~\ref{alg:sink} returns the
+value consistent with \eqref{eq:weps}.
 
 Greenkhorn \cite{awr2017} replaces the cyclic pass by a greedy
 single-coordinate update: each step picks the most-violated row or column
-(measured by a KL-type residual) and applies the exact closed-form update
-that restores that one marginal, at $O(n)$ cost per step with incremental
-marginal bookkeeping (Algorithm~\ref{alg:green}). The total-work guarantee
-of \cite{awr2017} is $\tilde O(n^2/\varepsilon^2)$ (with $O(n)$ per greedy
-step), giving a dimension-free dependence in terms of the desired additive
-accuracy.
+(measured by the KL-type residual $\rho(a,b)=b-a+a\log(a/b)$) and applies
+the exact closed-form update that restores that one marginal, at $O(n)$
+cost per step with incremental marginal bookkeeping
+(Algorithm~\ref{alg:green}). Early Greenkhorn analyses
+\cite{awr2017} gave an $\tilde O(n^2/\varepsilon^3)$ total-work bound in
+terms of additive accuracy; the tighter $\tilde O(n^2/\varepsilon^2)$
+bound is from later work \cite{lin2022}.
 
 \subsection{Exact solvers used}
 \paragraph{Dense.} We use SciPy's optimized Jonker--Volgenant-style
 shortest-augmenting-path implementation \texttt{linear\_sum\_assignment}
-\cite{jonker1987}, with $\Theta(n^3)$ worst-case time and $O(n^2)$ memory on
-dense inputs.
+\cite{jonker1987} (a modified JV algorithm in the spirit of Crouse), with
+empirical roughly-cubic scaling and $O(n^2)$ memory on dense inputs; see
+Section~\ref{sec:results}.
 \paragraph{Sparse pool.} For a pool $E_k\subseteq [n]\times[n]$ (the $k$
-nearest targets of each source, both sides), solve the assignment
+nearest targets of each source, symmetrically), solve the assignment
 restricted to $E_k$ as a minimum-weight perfect matching with our
-edge-list driver for Blossom~VI \cite{blossomvi} (Blossom~V
-\cite{blossomv} gives identical costs; see \S\ref{sec:setup}). Costs are
-integer (milliunits) as required by the driver. Blossom returns blossom
-duals in addition to node potentials; on bipartite inputs the blossom
-duals are zero at the optimum, so we restrict to the node potentials
-$(\alpha,\beta)$ without loss.
+edge-list driver for Blossom~VI \cite{blossomvi} (Blossom~V \cite{blossomv}
+gives identical matching costs; see Section~\ref{sec:setup}). Costs are
+integer (milliunits) as required by the driver. We note that the pool
+problem is bipartite, so any bipartite sparse LAP solver (shortest
+augmenting path, cost-scaling, auction with $\varepsilon$-scaling) could be
+substituted; the Blossom~VI driver was convenient because the same code
+base was used for prior non-bipartite matching experiments.
 \paragraph{1-D.} If sources and targets lie on a line, the optimal map is
-the quantile (order) map (Proposition~\ref{prop:1d}); no matrix is formed.
+a quantile (order) map (Proposition~\ref{prop:1d}); no matrix is formed.
+This covers the 1-D+noise ``near-Monge'' family, where the optimal map is
+close to the identity.
 
 \begin{proposition}[1-D optimality of the quantile map]
 \label{prop:1d}
 Let $x_{(1)}\le\cdots\le x_{(n)}$, $y_{(1)}\le\cdots\le y_{(n)}$. For the
-quadratic cost (and, more generally, for any convex function $h$, the cost
-$h(x_i-y_j)$), the identity map $x_{(i)}\mapsto y_{(i)}$ minimizes
-$\sum_i C_{i,\pi(i)}$ over all bijections $\pi$.
+quadratic cost, and more generally for any convex function $h$ applied to
+the pairwise difference (cost $h(x_i-y_j)$; this includes $|x_i-y_j|$ used
+in the 1-D+noise experiments), the identity map $x_{(i)}\mapsto y_{(i)}$
+is \emph{an} optimal bijection.
 \end{proposition}
 \begin{proof}
 It suffices to show no crossing is present in an optimal map. Suppose
@@ -265,19 +294,21 @@ convexity of $h$ gives the Monge inequality
 h(a-c)+h(b-d) \;\le\; h(a-d)+h(b-c),
 \]
 so uncrossing the pair does not increase the cost. Repeated uncrossing
-reduces the number of inversions and terminates at the identity map, which
-is therefore optimal. \cite[Ch.~2]{villani2009}
+reduces the number of inversions and terminates at a non-crossing
+(monotone) bijection, which is the identity up to ties
+\cite[Ch.~2]{villani2009}.
 \end{proof}
 
 \section{Approximate baselines: implementation and validation}
 \label{sec:approx}
 
 Both approximate methods are implemented in the log domain (NumPy,
-single-threaded) and stopped at the same marginal tolerance
-($10^{-9}$) or, when the cost stagnates (all Greenkhorn cells at the
-measured $f$), on a plateau. The regularization is parameterized as a
-fraction of the mean cost, $f=\varepsilon/\overline{C}$, on the grid
-$f\in\{0.05,0.02,0.01\}$ (plus $0.005$ at $n=500$).
+single-threaded) and stopped at a marginal tolerance of $10^{-9}$ on the
+dense grid, or on a cost plateau at the coarser tolerances
+$10^{-6}$--$10^{-3}$ typical of Greenkhorn at small $f$. The regularization
+is parameterized as a fraction of the mean entry of the cost matrix,
+$f=\varepsilon/\overline{C}$ where $\overline{C}=n^{-2}\sum_{ij}C_{ij}$, on
+the grid $f\in\{0.05,0.02,0.01\}$ (plus $0.005$ at $n=500$).
 
 Two validation facts structure the comparison. \emph{First}, Greenkhorn and
 vanilla Sinkhorn converge to the \emph{identical} entropic plan up to the
@@ -290,11 +321,19 @@ row-argmax permutation, our \texttt{greedy\_hard}). Hardening a converged
 $n=500$, $f=0.01$ plan (gap $5.4\%$) costs $+10.9\%$ over the exact
 optimum---which the exact solver returns, optimally, in $0.01\,\mathrm{s}$.
 
+We emphasise that these baselines are our own single-threaded NumPy
+implementations and are not tuned the way a library implementation (e.g.\
+POT \cite{flamary2021pot}) would be; our timing claims are therefore
+statements about these specific implementations on our testbed, not about
+fundamental limits of Sinkhorn/Greenkhorn.
+
 \section{Duality certificates for the pool solver}
 \label{sec:cert}
 
-This section is the theoretical contribution: a rigorous certificate for
-the pool solver that requires \emph{no} dense solve.
+This section gives a rigorous certificate for the pool solver that
+requires \emph{no} dense solve. It is a standard LP weak-duality argument
+applied to a clipped dual; what is new is the empirical documentation of
+how tight the bound is across families and~$k$.
 
 \paragraph{Setup.} The pool solver returns a perfect matching $M$ inside
 $E_k$, with cost $\mathrm{UB}=\sum_{(i,j)\in M} C_{ij}$. Since $M$ is a
@@ -305,15 +344,14 @@ returns, together with the pool matching, the dual of the pool problem:
 node potentials $(\alpha_i,\beta_j)$ with
 $\alpha_i+\beta_j\le C_{ij}$ on pool edges and
 $\sum_i\alpha_i+\sum_j\beta_j=\mathrm{UB}$ (complementary slackness; the
-blossom duals vanish for bipartite instances, see \S\ref{sec:prelim}).
+blossom duals vanish for bipartite instances, see Section~\ref{sec:prelim}).
 The dual is \emph{not} feasible for the dense problem (it may violate
 $\alpha_i+\beta_j\le C_{ij}$ off the pool), so it is not by itself a lower
 bound on $\mathrm{OPT}$. The repair below fixes exactly that.
 
-\begin{proposition}[One-sided dual repair]
+\begin{proposition}[One-sided dual clip]
 \label{prop:repair}
-Let $(\alpha,\beta)$ satisfy $\alpha_i+\beta_j\le C_{ij}$ for
-$(i,j)\in E_k$. Define
+For any vectors $(\alpha,\beta)$ (no assumption required), define
 \[
 \hat\beta_j \;=\; \min\Bigl(\beta_j,\; \min_i \bigl[C_{ij}-\alpha_i\bigr]\Bigr),
 \qquad
@@ -331,6 +369,13 @@ which the inner minimum is taken. Hence
 $\alpha_i+\hat\beta_j\le C_{ij}$ for all $(i,j)$. The second statement is
 symmetric. $\square$
 \end{proof}
+
+\noindent The clip needs no hypothesis on $(\alpha,\beta)$: it is simply a
+coordinate-wise projection of an arbitrary pair of vectors onto the dual
+feasible set of the assignment LP, i.e.\ the classical reduced-cost
+projection used in LP pricing and variable fixing. When $(\alpha,\beta)$
+comes from a pool optimum the clipped vectors are typically close to the
+true dual, which is what makes the bound empirically tight.
 
 \begin{theorem}[Pool gap certificate]
 \label{thm:cert}
@@ -366,65 +411,66 @@ The certificate can be loose; it is never wrong.
 
 \begin{remark}[Ordering of the repair]
 \label{rem:order}
-The two one-sided repairs are not comparable in general. The sequential
-two-pass variant (clip one side, then clip the other against the \emph{clipped}
-first side) is dominated by the one-sided variant that clips the second
-side last, but it can underperform the \emph{other} one-sided variant:
-on our instances the max-of-two rule of \eqref{eq:lb1} is
-$1$--$6\times$ tighter than either single ordering at $k=16$ on structured
-instances (e.g.\ $122.7\%\to 12.0\%$ certified width on a 1-D+noise
-$n=2000$ instance). We therefore always use \eqref{eq:lb1}.
+We take the \emph{maximum} of the two one-sided clips, following the rule
+in \eqref{eq:lb1}. A natural alternative is a sequential two-pass clip
+(e.g.\ clip $\alpha$ against $\beta$, then clip $\beta$ against the
+clipped $\hat\alpha$). The sequential variant is not dominated by either
+one-sided clip in general: it is always at least as large as the clip that
+ends on the $\beta$-side (because $\tilde\beta\le\beta$) but can be
+strictly smaller than the clip that ends on the $\alpha$-side. On our
+instances the max-of-two rule is the best of the cheap options and is
+typically several times tighter than either single one-sided clip at
+$k=16$ on structured instances. We therefore always use \eqref{eq:lb1}.
+The sequential clip can be iterated (at which point it becomes coordinate
+ascent on the dual objective); we leave a proper column-generation
+/pricing loop---the textbook way to drive the certified width to zero by
+iteratively adding violated edges---to future work.
 \end{remark}
 
-\begin{theorem}[Entropic dual floor]
+\begin{theorem}[Sinkhorn potentials are a dual lower bound]
 \label{thm:ent}
-For every $\varepsilon>0$, $W(\varepsilon)\le \mathrm{OPT}(C)$. In
-particular, the value of a \emph{converged} entropic solve,
-$V=\langle C,P^{\varepsilon}\rangle+\varepsilon\sum_{ij}P^{\varepsilon}_{ij}
-\log P^{\varepsilon}_{ij}$, is a rigorous lower bound on the unregularized
-optimum.
+Let $(u,v)$ be \emph{any} potentials satisfying
+$u_i+v_j\le C_{ij}$ for all $i,j$. Then
+$\sum_i u_i+\sum_j v_j\le \operatorname{OPT}(C)$, with equality if and only
+if $(u,v)$ is an optimal dual for the assignment LP. In log-domain
+Sinkhorn, the iterate $P_{ij}=\exp((u_i+v_j-C_{ij})/\varepsilon)$
+satisfies $u_i+v_j-C_{ij}=\varepsilon\log P_{ij}\le 0$ automatically at
+\emph{every} iteration (because $P_{ij}\le 1$ when the row sums are one),
+so $\sum_i u_i+\sum_j v_j$ is a rigorous lower bound on $\operatorname{OPT}$
+at every stopping point, with no convergence requirement and no feasibility
+restoration. At convergence of the smooth problem the dual value coincides
+with $W(\varepsilon)$ in \eqref{eq:weps}.
 \end{theorem}
 \begin{proof}
-For $x\in[0,1]$ one has $x\log x\le 0$ (with $0\log 0:=0$), and every
-entry of $P\in\mathcal{U}(n)$ lies in $[0,1]$ (row sums are one). Hence for
-every feasible $P$,
-\[
-\langle C,P\rangle+\varepsilon\sum_{ij}P_{ij}\log P_{ij}
-\;\le\; \langle C,P\rangle .
-\]
-Taking the minimum over $P\in\mathcal{U}(n)$ gives
-$W(\varepsilon)\le \min_P\langle C,P\rangle=\mathrm{OPT}(C)$. A converged
-Sinkhorn run satisfies $V=W(\varepsilon)$ up to the duality gap of the
-smooth convex problem, which is $0$ at the optimum.
+By weak duality for the assignment LP: any dual-feasible $(u,v)$ satisfies
+$\sum_i u_i+\sum_j v_j\le\operatorname{OPT}(C)$. For the log-domain Sinkhorn
+iterate, $P_{ij}=\exp((u_i+v_j-C_{ij})/\varepsilon)$ with $P\mathbf 1=\rho$
+for some positive $\rho$ (exactly or approximately), so $P_{ij}\le\rho_i\le\max_i\rho_i$.
+If we use the standard iterates (which enforce $P\mathbf 1=\mathbf 1$ after
+each row pass and $P^{\mathsf T}\mathbf 1=\mathbf 1$ after each column pass)
+then $P_{ij}\le 1$ entrywise, giving $u_i+v_j-C_{ij}\le 0$ as claimed.
 \end{proof}
 
-\begin{remark}[Numerical feasibility]
+\begin{remark}[On the entropic dual]
 \label{rem:num}
-Our runs stop at maximum marginal deviation $\delta=10^{-9}$, so $P$ is
-$\delta$-feasible rather than exactly feasible. A standard feasibility
-restoration (add a correction $\Delta$ with $\lVert\Delta\rVert_1\le 2n\delta$)
-changes the value by at most
-$\lVert C\rVert_\infty\lVert\Delta\rVert_1+O(\varepsilon n\delta)
-\;\le\; \lVert C\rVert_\infty\cdot 2n\delta + O(\varepsilon n\delta)$.
-On our instances $\lVert C\rVert_\infty\le 141.5$ and $n\le 2000$, so the
-correction is $\lesssim 6\times 10^{-4}$ in absolute terms against costs of
-$O(10^3)$---nine orders of magnitude below any gap reported.
+The Sinkhorn dual $\sum_i u_i+\sum_j v_j$ is valid at every iterate
+(Theorem~\ref{thm:ent}), which removes any need for a $\delta$-feasibility
+restoration. At usable $\varepsilon$ the bound is typically loose because
+the negative entropy term is large: at $n=2000$, $\varepsilon\approx 0.05\cdot 52\approx 2.6$
+gives an entropy contribution on the order of $-\varepsilon n\log n\approx -4\times 10^4$,
+far below OPT. Better entropy-corrected variants
+$\mathrm{LB}_{\varepsilon}=D_{\varepsilon}-\varepsilon H(a)-\varepsilon H(b)$
+that quantitatively bound $0\le\mathrm{OPT}-\mathrm{LB}_{\varepsilon}\le\delta$
+are known \cite[\S4.1]{peyre2019} and would strengthen the bound at small
+extra cost; we leave them to future work.
 \end{remark}
 
 \paragraph{Combined certificate.} We report
-$\mathrm{LB}=\max(\mathrm{LB}_1,\, W(\varepsilon))$ with
+$\mathrm{LB}=\max(\mathrm{LB}_1,\, \sum_i u_i+\sum_j v_j)$ with
 $\varepsilon=0.05\,\overline{C}$ whenever the Sinkhorn run converges in
 time. In every measured instance the dual-repair bound $\mathrm{LB}_1$
-dominates the entropic one at $k\ge 16$. At the affordable
-$\varepsilon=0.05\overline{C}$ the entropy term
-$\varepsilon\sum P^\varepsilon_{ij}\log P^\varepsilon_{ij} \approx
--\varepsilon n\log n$ is large and negative (for $n=2000$, $\varepsilon\approx 3.5$,
-on the order of $-5\times 10^4$), which makes $W(\varepsilon)$ a valid but
-\emph{vacuous} lower bound---negative on most families and far below $\mathrm{LB}_1$.
-$W(\varepsilon)$ becomes tight only when $\varepsilon$ is small enough
-that Sinkhorn itself is more expensive than the dense solve. We therefore
-report $\mathrm{LB}_2=W(\varepsilon)$ only as a labelled cross-check; the
-certificate's real work is done by $\mathrm{LB}_1$.
+dominates the Sinkhorn dual at $k\ge 16$; the Sinkhorn dual is reported
+as a labelled cross-check.
 
 \section{Experimental setup}
 \label{sec:setup}
@@ -436,34 +482,41 @@ dense exact, Sinkhorn, and Greenkhorn codes; a C++20 build of Blossom~VI
 solves; and Blossom~V \cite{blossomv}, used only to cross-validate
 matching costs (identical on every instance tested). All costs are rounded
 to milliunits for the integer solvers, and all gaps are computed on this
-same rounding.
+same rounding. \textbf{Timings are single runs} (single-threaded wall time,
+same machine, same process order) and are reported for reproducibility on
+this hardware; they are not averaged over multiple runs and should be
+read as order-of-magnitude rather than as benchmark-grade timings.
 
 \paragraph{Instance families} (2-D Euclidean distances; details in
 Appendix~\ref{app:detail}).
 \begin{itemize}[leftmargin=2em,itemsep=1pt]
 \item \textbf{uniform}: i.i.d.\ points in $[0,100)^2$.
 \item \textbf{clustered}: 8 cluster centers in $[0,100)^2$; each side's
-  points are assigned round-robin to a center with Gaussian noise
-  ($\sigma=8$); the two sides share the assignment, with the target centers
-  jittered by isotropic Gaussian noise of standard deviation $3$
-  (i.e.\ $\mathcal{N}(0,3^2 I)$)---corresponding Gaussian clusters.
-\item \textbf{1-D+noise}: one-dimensional points on two parallel noisy
-  lines (position noise $\sigma=2$; cross noise $\sigma=2$)---a near-Monge
-  structure with disorder.
+  points are assigned round-robin to a center with Gaussian noise of
+  standard deviation $\sigma=8$; the two sides use the same assignment
+  pattern, with target centers jittered by isotropic Gaussian noise of
+  standard deviation $3$ (i.e.\ $\mathcal{N}(0,3^2 I)$).
+\item \textbf{1-D+noise}: one-dimensional base positions on two parallel
+  noisy lines (along-line noise $\sigma=2$; cross-line noise $\sigma=2$);
+  see Appendix~\ref{app:detail}.
 \end{itemize}
 Dense grid: $n\in\{500,1000,2000,4000,8000\}$, seed 7, uniform
-($n=12000$ OOMs: the $1.15\,\mathrm{GB}$ cost matrix alone exceeds the
-2-GB budget). Robustness sweep: $n=1000$, seeds 7--10, all three families
-(9 configurations); certificate study adds $n=2000$, seed 7, all families
-(15 configurations in total). The multi-robot application uses
-$n\in\{50,200,800\}$, seeds 7--8, 15 rounds.
+($n=12000$ runs out of memory after interpreter and NumPy temporaries: a
+$12000^2$ double matrix is $1.15\,\mathrm{GB}$, which leaves too little
+headroom on a 2-GB sandbox). Robustness sweep: $n=1000$, seeds 7--10, all
+three families (12 configurations); the certificate study adds $n=2000$,
+seed 7, all three families (15 configurations total). The multi-robot
+application uses $n\in\{50,200,800\}$, seeds 7--8, 15 rounds.
 
 \section{Results}
 \label{sec:results}
 
 \subsection{Dense scaling: exact is cheap}
 Table~\ref{tab:dense} reports dense exact costs and times (uniform, seed 7).
-The $n^3$ law holds cleanly to $n=8000$; $n=12000$ is the memory wall.
+A log-log fit to the five times gives an empirical scaling of roughly
+$n^{2.55}$ over this range (the per-doubling ratios are 6.0, 3.8, 9.4,
+5.3, versus the 8.0 predicted by $\Theta(n^3)$); $0.01\,\mathrm{s}$ is
+near the timer resolution.
 
 \begin{table}[t]
 \centering
@@ -480,20 +533,17 @@ $n$ & exact cost & $t(\mathrm{exact})$ \\
 \end{tabular}
 \caption{Dense exact assignment (Jonker--Volgenant), uniform seed 7.
   Costs use the total-mass convention; divide by $n$ for the per-unit-mass
-  value common in the OT literature.}
+  value common in the OT literature. Times are single runs.}
 \label{tab:dense}
 \end{table}
 
 \subsection{The quality--time trade-off of the approximate methods}
 Table~\ref{tab:approx} reports vanilla Sinkhorn on the dense grid. Two
-features stand out. \emph{(i) The gap is a regularization bias:}
-an ordinary least-squares linear fit through the origin on the three
-converged $n=500$ points $f\in\{0.01,0.02,0.05\}$ (gaps
-$5.42\%$, $15.02\%$, $58.41\%$) gives slope $m\approx 1353$, i.e.\
-gap $\approx 1353\,f$ per cent. The gap/$f$ ratio itself increases with
-$f$, so the linear form is an approximation. \emph{(ii) At fixed $f$ the
-gap \emph{grows} with $n$:} $15.02\%\to 24.19\%\to 43.78\%$ at $f=0.02$
-for $n=500/1000/2000$.
+features stand out. \emph{(i) The gap is a regularization bias}: it
+shrinks roughly linearly with $f$ over the measured range, but the local
+slope is not constant (gap/$f$ is 542 at $f=0.01$ and 1168 at $f=0.05$).
+\emph{(ii) At fixed $f$ the gap \emph{grows} with $n$:}
+$15.02\%\to 24.19\%\to 43.78\%$ at $f=0.02$ for $n=500/1000/2000$.
 
 \begin{table}[t]
 \centering
@@ -513,55 +563,58 @@ $n$ & $f$ & gap \% & $t(\mathrm{Sinkhorn})$ \\
 \bottomrule
 \end{tabular}
 \caption{Vanilla Sinkhorn (log domain, marginal tolerance $10^{-9}$),
-uniform seed 7.}
+uniform seed 7. Gaps are relative to the exact optimum computed on the
+rounded milliunit costs.}
 \label{tab:approx}
 \end{table}
 
 \paragraph{The $1\%$ target, rough extrapolation.}
-Taking the slope above as the local gap rate, the $1\%$ target would
-require $f^*\approx 1/1353\approx 7.4\times 10^{-4}$. A log-log linear
+To reach a $1\%$ gap requires an $f^*$ in the range $\sim 10^{-3}$ (a
+no-intercept fit gap$\approx 1092 f$ on the three $n=500$ points gives
+$f^*\approx 9\times 10^{-4}$; an OLS fit \emph{with} intercept gives a
+slope of $1353$ and intercept $-9.8$, which yields $f^*\approx 8\times 10^{-3}$
+when forced through gap$\,=1$\% -- the two fits differ by an order of
+magnitude, which is itself a warning about extrapolation). A log-log linear
 fit to Greenkhorn's step count on the four $n=500$ plateau runs gives
-$1.241\times 10^4\,f^{-1.03}$, i.e.\ $\approx 2.13\times 10^7$ steps at
-$f^*$; per-step costs are the \emph{measured} ones, scaled in $n$ as $O(n)$
-(Greenkhorn) and $O(n^2)$ (vanilla) from the measured runs.
-Table~\ref{tab:target} gives the result. These numbers are a \emph{rough
-extrapolation} (a power law fitted on four points and projected an order
-of magnitude outside the measured range), not a rigorous bound; they are
-optimistic for the approximate methods, because at fixed $f$ the gap grows
-with $n$ (Table~\ref{tab:approx}), so the $f$ required to hit $1\%$ at
-larger $n$ is likely smaller than $f^*$, making these times a lower bound
-on the true cost. Even so, the factor over exact is $533\times$--$72{,}000\times$.
+$1.241\times 10^4\,f^{-1.03}$; using the no-intercept slope $1092$ gives
+$f^*\approx 9\times 10^{-4}$ and $\approx 1.7\times 10^7$ steps,
+producing the order-of-magnitude times in Table~\ref{tab:target}. These
+numbers are a \emph{rough power-law projection} (the fit is over four
+points and projected an order of magnitude outside the measured range),
+not a rigorous bound; they are likely optimistic for the approximate
+methods in some ways (gap grows with $n$ at fixed $f$) and pessimistic in
+others (gap/$f$ falls as $f$ shrinks, so the slope at $f\ge 0.01$
+over-estimates the gap at $f^*$). We report them to give an order of
+magnitude, not as precise timing.
 
 \begin{table}[t]
 \centering
+\small
 \begin{tabular}{rrrr}
 \toprule
 $n$ & $t(\mathrm{exact})$ & $t(\mathrm{Sinkhorn\ at\ }f^*)$ & $t(\mathrm{Greenkhorn\ at\ }f^*)$ \\
 \midrule
-500  & 0.01\,s  & 227\,min   & 12\,min  \\
-1000 & 0.06\,s  & 909\,min   & 15\,min  \\
-2000 & 0.23\,s  & 3637\,min  & 25\,min  \\
-4000 & 2.16\,s  & 14546\,min & 51\,min  \\
-8000 & 11.48\,s & 58184\,min & 102\,min \\
+500  & 0.01\,s  & $\sim$200\,min   & $\sim$10\,min  \\
+1000 & 0.06\,s  & $\sim$800\,min   & $\sim$15\,min  \\
+2000 & 0.23\,s  & $\sim$3000\,min  & $\sim$25\,min  \\
+4000 & 2.16\,s  & $\sim$10$^4$\,min & $\sim$50\,min  \\
+8000 & 11.48\,s & $\sim$5$\times10^4$\,min & $\sim$100\,min \\
 \bottomrule
 \end{tabular}
-\caption{Wall time to reach the $1\%$ quality target. Approximate times are
-  a rough power-law extrapolation described in the text; they are
-  optimistic for the approximate methods (see text).}
+\caption{Wall time to reach $1\%$ gap, extrapolated as described in the
+  text (rough order-of-magnitude; see caveats).}
 \label{tab:target}
 \end{table}
 
 \subsection{Measured head-to-head: Greenkhorn vs vanilla}
-Table~\ref{tab:ghead} is the measured comparison between the two
-approximate methods at every $(n,f)$ cell. The SOTA accelerated method
-\emph{does not close the gap to exact}: it converges to the identical
-entropic plan up to plateau tolerance (cost agreement $\le 0.04\%$) and is
-$1.0$--$5.0\times$ faster than plain Sinkhorn on the seven cells where
-vanilla converged (six of seven within $1.5\times$; the $5.01\times$
-outlier is $n=2000$, $f=0.05$). In this small-regularization,
-high-condition-number regime the greedy selection makes less progress per
-step than a full cyclic pass and plateaus in marginal accuracy
-($10^{-6}$--$10^{-3}$ vs $10^{-9}$) while the gap has already settled.
+Table~\ref{tab:ghead} is the measured comparison. Greenkhorn is
+$0.93\times$--$5.0\times$ the wall time of plain Sinkhorn (faster in $8$
+of $9$ cells, within $1.5\times$ in $6$ of $9$; geometric mean $\approx
+1.6\times$), and converges to the same entropic plan up to plateau
+tolerance (cost agreement $\le 0.04\%$). In the small-regularization,
+high-condition-number regime needed for $\le 1\%$ accuracy, the greedy
+selection plateaus in marginal accuracy ($10^{-6}$--$10^{-3}$) while the
+cost has already settled; this is where the speedup is modest.
 
 \begin{table}[t]
 \centering
@@ -584,28 +637,38 @@ $n$ & $f$ & gap V \% & $t(V)$ s & gap G \% & $t(G)$ s & steps(G) & $t(V)/t(G)$ \
 \caption{Vanilla Sinkhorn (V) vs Greenkhorn (G), uniform seed 7.
 $^\dagger$ 400\,s cap (vanilla did not converge there). All Greenkhorn runs
 stopped on a cost plateau before reaching marginal tolerance $10^{-9}$
-(typical plateau $10^{-6}$--$10^{-3}$); cost agreement $\le 0.04\%$ in
-every cell.}
+(typical plateau $10^{-6}$--$10^{-3}$); cost agreement $\le 0.04\%$ in every
+cell.}
 \label{tab:ghead}
 \end{table}
 
 \subsection{The pool solver and its certificate}
 Table~\ref{tab:pool} shows the pool solver on the dense $n=2000$ reference
 (quality vs $k$); Figure~\ref{fig:crossover} situates it in the
-quality--time plane against the approximate baselines. At small $k$
-(e.g.\ $k=4$ on this instance) the pool happened to contain a perfect
-matching; at $k=1$ Hall's condition fails and the solver reports
-infeasible (Appendix~\ref{app:detail}).
+quality--time plane against the approximate baselines.
+
+\emph{Note on the pool construction.} The edge counts in
+Table~\ref{tab:pool} slightly exceed the bound $2kn$ (e.g.\ 19{,}973
+edges at $k=4$, against a hard bound of $16{,}000$). This is because the
+$k$NN pool was built by a driver that took each row's and each column's
+\emph{$(k+1)$} cheapest edges before the union (an off-by-one in the
+original code), i.e.\ the reported runs correspond to a per-side budget of
+$k+1$; the edge counts match $2(k+1)n-(k+1)^2$ to within the expected
+random-kNN overlap. The corrected $k$-per-side implementation is shipped
+in the repository (see \texttt{otlib.py::knn\_pool}); the cached tables
+below reflect the original runs and are preserved for reproducibility.
+At small effective $k$ the pool can be Hall-infeasible (e.g.\ at $k=1$),
+in which case the solver reports infeasible.
 
 \begin{table}[t]
 \centering
 \small
 \begin{tabular}{rrrrr}
 \toprule
-$k$ & pool edges & cost & gap vs exact & $t(\mathrm{sparse})$ \\
+$k$ label & pool edges & cost & gap vs exact & $t(\mathrm{sparse})$ \\
 \midrule
 4   & 19{,}973  & 5757.7 & +38.861\% & 0.02\,s \\
-8   & 35{,}918  & 4388.6 & +5.842\%  & 0.05\,s \\
+8   & 35{,}918  & 4388.6 & +5.841\%  & 0.05\,s \\
 16  & 67{,}685  & 4170.5 & +0.581\%  & 0.08\,s \\
 32  & 130{,}860 & 4147.7 & +0.032\%  & 0.18\,s \\
 64  & 255{,}711 & 4146.5 & +0.003\%  & 0.40\,s \\
@@ -613,19 +676,19 @@ $k$ & pool edges & cost & gap vs exact & $t(\mathrm{sparse})$ \\
 \bottomrule
 \end{tabular}
 \caption{$k$NN-pool exact assignment (Blossom~VI), $n=2000$ uniform seed 7;
-dense exact $=4146.4$ in $0.23\,$s. Feasibility at small $k$ is
-instance-dependent; at $k=1$ the pool is Hall-infeasible.}
+dense exact $=4146.4$ in $0.23\,$s. Edge counts reflect a $k+1$ per-side
+budget in the original driver (see text); gaps are computed against the
+unrounded exact optimum.}
 \label{tab:pool}
 \end{table}
 
 The certificate study (Section~\ref{sec:cert}) ran all 15 configurations
-(seeds 7--10 $\times$ families at $n=1000$; seed 7 at $n=2000$) at
-$k\in\{16,32,64\}$: \textbf{45/45 cells satisfy
-$\mathrm{LB}\le \mathrm{exact}\le \mathrm{UB}$ and
-certified width $\ge$ true gap} (asserted in the study code).
-Table~\ref{tab:cert} summarizes the certified width
-$(\mathrm{UB}-\mathrm{LB})/\mathrm{UB}$ by family;
-Figure~\ref{fig:cert} shows it per configuration.
+(seeds 7--10 $\times$ families at $n=1000$, i.e.\ 12 cells; seed 7 at
+$n=2000$, i.e.\ 3 cells) at $k\in\{16,32,64\}$: \textbf{45/45 cells
+satisfy $\mathrm{LB}\le \mathrm{exact}\le \mathrm{UB}$ and certified width
+$\ge$ true gap} (asserted in the study code). Table~\ref{tab:cert}
+summarizes the certified width $(\mathrm{UB}-\mathrm{LB})/\mathrm{UB}$ by
+family; Figure~\ref{fig:cert} shows it per configuration.
 
 \begin{table}[t]
 \centering
@@ -638,12 +701,13 @@ uniform (5)     & 2.57--6.26\%  & \textbf{0.07--0.70\%} & 0.01--0.02\% \\
 clustered (5)   & 5.61--38.25\% & 1.03--21.88\% & 0.17--5.90\% \\
 1-D+noise (5)   & 11.94--17.35\% & 1.89--3.59\% & 0.24--0.79\% \\
 \midrule
-true gaps, $k=16$ / $k=32$ / $k=64$ &
+all families, true gaps &
 0.52--3.84\% & 0.010--2.60\% & 0.000--1.85\% \\
 \bottomrule
 \end{tabular}
-\caption{Certificate width by family (range over the five configurations
-each); all 45 cells carry $\mathrm{LB}>0$.}
+\caption{Certificate width by family (range over configurations; 15 cells
+at each $k$). The bottom row pools true gaps across all families; all 45
+cells carry $\mathrm{LB}>0$.}
 \label{tab:cert}
 \end{table}
 
@@ -651,9 +715,9 @@ each); all 45 cells carry $\mathrm{LB}>0$.}
 \centering
 \includegraphics[width=0.98\textwidth]{figs/crossover.png}
 \caption{Exact (Jonker--Volgenant) vs vanilla Sinkhorn and Greenkhorn on
-the dense uniform grid; dashed/dotted lines are the rough measurement-based
-extrapolations to the $1\%$ target. Exact is below both approximate curves
-at every measured $n$ in both time and quality.}
+the dense uniform grid; dashed/dotted lines are the rough extrapolations
+to the $1\%$ target. Exact is below both approximate curves at every
+measured $n$ in both time and quality.}
 \label{fig:crossover}
 \end{figure}
 
@@ -672,57 +736,78 @@ configuration.}
 test of the implementation, not of the math. (ii)~\emph{Tightness}: where
 the pool is tight (uniform instances), the width is tight too---$\le 0.70\%$
 at $k=32$ against a true gap $\le 0.13\%$, and $\le 0.02\%$ at $k=64$.
-On the block-structured (clustered) and near-Monge (1-D+noise) families the
-repair is conservative: the pool dual is large where it must be clipped
-hard against cheap off-pool edges, so the width is looser (up to
-$21.88\%$ at $k=32$, true gap $1.73\%$). It is still a \emph{valid} bound,
-and---importantly---the width \emph{tightens monotonically in $k$ on every
-configuration}, so ``widen the pool'' is a certified escape hatch.
-(iii)~\emph{Cost}: certificate $=$ pool solve $+$ one $O(n^2)$ repair,
-$\le 0.73\,\mathrm{s}$ in total on our $n=2000$ cells, comparable to the
-dense solve.
+On block-structured (clustered) and near-Monge (1-D+noise) families the
+repair is conservative, because the pool dual is large where it must be
+clipped against cheap off-pool edges (up to $21.88\%$ at $k=32$, true gap
+$1.73\%$). The bound remains \emph{valid}, and the width tightens
+monotonically in $k$ on every configuration, so widening the pool is a
+certified escape hatch. A standard column-generation / pricing loop
+(price off-pool edges with the clipped dual, add the most-violated ones,
+re-solve) typically drives the certified width to zero for a fraction of
+the dense-solve cost; this is the natural next step and is left to future
+work. (iii)~\emph{Cost}: the clip itself is an $O(n^2)$ pass over the
+cost matrix and therefore has the same memory footprint as dense
+assignment; on our $n=2000$ cells it adds $\le 0.73\,\mathrm{s}$ to the
+pool solve.
 
 \subsection{Robustness across seeds and distributions}
-On the 9-configuration $n=1000$ sweep (seeds 7--10 $\times$ families):
-exact is fastest everywhere ($0.07$--$0.10\,$s) and optimal; the $k=32$
-pool solver is feasible in $9/9$ with gaps $+0.010\%$ to $+2.599\%$ in
-$<0.15\,$s; Greenkhorn at $f=0.01$ sits at $+6.3\%$ to $+14.7\%$ (agreeing
-with vanilla to $\le 0.05\%$ in the 8 converged cells); vanilla needs
-$\ge 400\,$s \emph{without converging} on the four symmetric clustered
-configurations, where Greenkhorn's plateau matches it in $50$--$98\,$s.
+On the 12-configuration $n=1000$ sweep (seeds 7--10 $\times$ families):
+exact is fastest everywhere ($0.07$--$0.10\,\mathrm{s}$, consistent with
+the $0.06\,\mathrm{s}$ at seed-7 uniform given seed/family variation) and
+optimal; the $k=32$ pool solver is feasible in all cells with gaps
+$+0.010\%$ to $+2.599\%$ in $<0.15\,\mathrm{s}$; Greenkhorn at $f=0.01$
+sits at $+6.3\%$ to $+14.7\%$ (agreeing with vanilla to $\le 0.05\%$ in
+the converged cells); vanilla needs $\ge 400\,\mathrm{s}$ without
+converging on the symmetric clustered configurations, where Greenkhorn's
+plateau matches it in $50$--$98\,\mathrm{s}$.
 
 \subsection{1-D structure}
-The quantile map solves the 1-D family in $O(n\log n)$ with no matrix:
-$n=10^6$ in $0.11\,$s, where the dense cost matrix alone is $8\,\mathrm{TB}$.
+The quantile map solves the 1-D family in $O(n\log n)$ sort time with no
+matrix: $n=10^6$ in $0.11\,\mathrm{s}$, where the dense cost matrix alone
+would be $8\,\mathrm{TB}$.
 
 \section{Application: multi-robot task allocation}
 \label{sec:app}
 
 The clearest regime for the discrete plan as deliverable is multi-robot
 task allocation \cite{gerkey2004}: in warehouse picking, drone teaming, or
-AMR dispatch, each of $n$ robots must be assigned \emph{exactly one} of $n$
-tasks---a fractional transport plan is physically meaningless (one cannot
-dispatch half a robot). The standard practice is precisely the
-Hungarian/auction family of exact solvers \cite{bertsekas1989, jonker1987}.
+AMR dispatch, each of $n$ robots must be assigned \emph{exactly one} of
+$n$ tasks---a fractional transport plan is physically meaningless (one
+cannot dispatch half a robot). The standard practice in MRTA is precisely
+the Hungarian/auction family of exact solvers
+\cite{bertsekas1988, jonker1987, gerkey2004}; we include this experiment
+as a sanity check on a regime where integer plans are required, not as a
+novel robotics result.
 
 \paragraph{Protocol.} Open field $[0,100)^2$; 15 rounds; each round, $n$
 fresh tasks appear, robots are (re)assigned with cost
-$C_{ij}=\lVert r_i - t_j\rVert_2$ from the robots' current positions, and
-robots then move to their tasks. All three policies share the \emph{same}
-start positions and the \emph{same} task stream per round, so only the
-per-round assignment differs. Policies: \textbf{exact} (Jonker--Volgenant
-per round); \textbf{greedy} (cheapest-first); \textbf{Sinkhorn+hardening}
-(our $f=0.05$, tolerance $10^{-7}$ pipeline from
-Section~\ref{sec:approx}; an integer plan is produced regardless).
+$C_{ij}=\lVert r_i-t_j\rVert_2$ from the robots' current positions, and
+robots then move to their assigned tasks. All three policies share the
+\emph{same} start positions and the \emph{same} task stream per round, so
+only the per-round assignment differs. Policies: \textbf{exact} (myopic
+Jonker--Volgenant per round); \textbf{greedy} (cheapest-first serial
+assignment); \textbf{Sinkhorn+hardening} (our $f=0.05$, marginal tolerance
+$10^{-7}$ pipeline, then greedy hardening to an integer plan).
 $n\in\{50,200,800\}$, seeds 7--8; Table~\ref{tab:robot} reports the
 episode totals.
+
+\textbf{Caveat on optimality.} Because each round's assignment determines
+the next round's robot positions, per-round myopic optimality does
+\emph{not} minimise the 15-round total distance (the true episode optimum
+requires dynamic programming / rollout / lookahead). The ``gap'' columns
+in Table~\ref{tab:robot} are therefore gaps relative to the myopic-exact
+policy, not to the global episode optimum. Even so, the comparison is
+informative: the Sinkhorn pipeline is both slower per round and yields
+larger cumulative travel than myopic-exact, because the regularisation
+bias pushes assignments away from the nearest-task plan in a way that
+compounds across rounds.
 
 \begin{table}[t]
 \centering
 \small
 \begin{tabular}{rrrrrrr}
 \toprule
-$n$ & seed & travel (exact) & greedy & Sinkhorn+hard & gap greedy & gap Sinkh. \\
+$n$ & seed & travel (myopic exact) & greedy & Sinkhorn+hard & gap greedy & gap Sinkh. \\
 \midrule
 50  & 7 & 10232.8 & 12353.3 & 10930.4 & +20.72\% & +6.82\% \\
 50  & 8 & 10531.8 & 12357.2 & 11134.9 & +17.33\% & +5.73\% \\
@@ -732,9 +817,8 @@ $n$ & seed & travel (exact) & greedy & Sinkhorn+hard & gap greedy & gap Sinkh. \
 800 & 8 & 49050.9 & 66519.9 & 61229.6 & +35.61\% & +24.83\% \\
 \bottomrule
 \end{tabular}
-\caption{Total travel distance over 15 rounds; gaps relative to the
-exact-assignment policy, which is the best achievable (optimal every
-round).}
+\caption{Total travel distance over 15 rounds; gaps are relative to the
+myopic-exact policy (see text for the global-optimality caveat).}
 \label{tab:robot}
 \end{table}
 
@@ -750,15 +834,15 @@ slower.}
 
 \paragraph{Findings.}
 (i)~\emph{The quality tax accumulates}: per-round gaps compound through
-robot positions; over 15 rounds greedy ends $+17.3$--$+37.3\%$ and
-Sinkhorn+hardening $+5.7$--$+26.7\%$ above the exact policy, and the gap
-grows with $n$ (the entropic gap grows with $n$ at fixed $f$,
-Section~\ref{sec:results}). (ii)~\emph{Approximate is not even faster
-here}: the assignment step takes exact $0.1$--$68\,\mathrm{ms}$/round vs
-$0.12$--$15.9\,$s for the Sinkhorn pipeline ($\approx 239\times$ at
-$n=800$). (iii)~\emph{The hook}: where the discrete plan is the deliverable,
-approximate OT is a tax on \emph{both} time and distance at
-$n\le 10^3$; the exact default holds up to the memory wall.
+robot positions; over 15 rounds greedy ends $+17$--$+37\%$ and
+Sinkhorn+hardening $+6$--$+27\%$ above the myopic-exact policy, and the
+gap grows with $n$. (ii)~\emph{Approximate is not even faster here}: the
+assignment step takes myopic-exact $0.1$--$68\,\mathrm{ms}$/round vs
+$0.12$--$15.9\,\mathrm{s}$ for the Sinkhorn pipeline ($\approx 239\times$
+at $n=800$). (iii)~\emph{The hook}: where a discrete integer plan is the
+deliverable, a Sinkhorn-plus-hardening pipeline is a tax on \emph{both}
+time and quality at $n\le 10^3$; an exact bipartite solver is the default
+choice, all the way up to the memory wall.
 
 \section{Discussion}
 \label{sec:disc}
@@ -768,53 +852,56 @@ Integer plan needed $\to$ exact; 1-D/Monge $\to$ closed form; local/$k$NN
 structure $\to$ sparse pool exact, \emph{with its certificate}
 (Section~\ref{sec:cert}); dense, no structure, fractional plan
 acceptable $\to$ exact up to the memory wall ($n\approx 1.2\times 10^4$
-on this hardware), beyond which the Sinkhorn family wins on time and
-memory---that regime is genuinely theirs.
+on this hardware), beyond which well-tuned Sinkhorn-family
+implementations win on time and memory.
 
-\paragraph{Why the certificate matters, and what it is not.}
-Pool sparsity is a heuristic; the certificate converts it into a
-\emph{guarantee}: the solver announces ``my solution is within $w\%$ of
-optimal'' with $w$ computed from its own dual in milliseconds. In
-applications where a $\le 1\%$ guarantee is a requirement (dispatching,
-pricing, auditing), this replaces a dense re-solve or a conservative
-safety margin. Mechanically, the one-sided clip is the same dual restriction
-used classically for reduced-cost variable fixing in integer programming
-\cite{schrijver2003} and bears a family resemblance to screening tests for
-entropic OT \cite{alaya2019screenkhorn}. What distinguishes it here is the
-packaging: (a)~the clip runs in a single $O(n^2)$ pass \emph{after} the
-sparse solve and requires no iteration; (b)~the max-of-two rule gives a
-noticeably tighter bound than either one-sided clip alone
-(Remark~\ref{rem:order}); and (c)~it certifies an \emph{exact} pool
-solution rather than screening edges for a regularized solver.
+\paragraph{What the certificate is, and what it is not.}
+The clip of Proposition~\ref{prop:repair} is a textbook dual projection,
+not a new theorem; its value is engineering: the solver can report ``my
+solution is within $w\%$ of optimal'' with $w$ computed from its own
+dual in milliseconds, using an operation that costs one $O(n^2)$ pass.
+Where a $\le 1\%$ guarantee is a requirement (dispatching, pricing,
+auditing), this replaces a dense re-solve or a conservative safety margin.
+The certificate is loose on clustered families (up to $\sim 22\%$ at
+$k=32$) and is currently computed as a one-shot clip; we expect that a
+standard pricing/column-generation loop (add off-pool edges with negative
+reduced cost, re-solve) would drive the certified width to zero for a
+fraction of the dense cost, which we leave to future work.
 
 \paragraph{Limitations.}
-(i) Two-core/2-GB testbed: wall times are single-machine; the memory wall
-($n\approx 1.2\times 10^4$) is hardware-specific, though the $O(n^2)$
-memory of any dense method is not. (ii) The $f^*$ extrapolation
-(Table~\ref{tab:target}) is a rough power-law projection, not a theorem,
-as documented. (iii) The certificate is conservative on block-structured
-instances (Remark~\ref{rem:order}; Table~\ref{tab:cert}); a
-structure-aware repair (e.g.\ exploiting the cluster geometry) is future
-work. (iv) The application is synthetic (no obstacles, kinematics, or
-traffic); the point is structural---the discrete plan is the deliverable---
-not a robotics benchmark. (v) We do not compare against GPU
-approximate-matching or near-linear Sinkhorn implementations; those target
-exactly the large-$n$ regime we do not claim.
+(i) Two-core/2-GB testbed and single-run timings: wall times are
+hardware-specific and should not be read as benchmarks; only the
+\emph{qualitative} comparisons (exact is milliseconds to seconds,
+Sinkhorn is 100--1000$\times$ slower at small $n$) are intended to
+generalize. (ii) The $f^*$ extrapolation (Table~\ref{tab:target}) is a
+rough power-law projection, as documented, and carries $\sim$order-of-magnitude
+model uncertainty. (iii) The certificate is conservative on block-structured
+instances (Table~\ref{tab:cert}); a structure-aware repair or a
+column-generation loop is future work. (iv) The application is synthetic
+(no obstacles, kinematics, or traffic), and myopic per-round assignment is
+not globally optimal over an episode; the point is structural, not a
+robotics benchmark. (v) We do not compare against auction algorithms with
+$\varepsilon$-scaling, dedicated bipartite sparse LAP solvers,
+stabilised/$\varepsilon$-annealed Sinkhorn, or GPU implementations; those
+are important baselines for a full benchmark paper and should be added in
+follow-on work. (vi) The $k$NN-pool driver used for the cached results
+had an off-by-one (see Section~\ref{sec:results}); the corrected code is
+shipped in the repository.
 
 \section{Conclusion}
 Balanced discrete OT is the assignment problem, and the assignment problem
-is a matching problem---so the industrial Blossom engine gives exact optimal
-transport with an integer plan and an exact value. Measured against the
-standard approximate alternatives on the moderate-$n$ regime, exact is
-faster \emph{and} more accurate; the state-of-the-art accelerated
-approximation (Greenkhorn) improves on plain Sinkhorn by $1$--$5\times$ but
-pays the same regularization gap. We gave the sparse pool solver a rigorous
-gap certificate---a repaired matching dual that costs one $O(n^2)$ pass and
-is comparable in cost to the dense solve it certifies---and showed, in a
-multi-robot application, that where the plan itself is the deliverable,
-approximate OT is a tax on both time and quality. The Sinkhorn family's
-large-$n$ dense regime stands untouched, and the boundary between the two
-regimes is now measured and certified rather than assumed.
+is a bipartite matching problem, so industrial matching engines give exact
+optimal transport with an integer plan and an exact value. Measured
+against hand-written NumPy Sinkhorn and Greenkhorn baselines on the
+moderate-$n$ regime, exact matching is faster \emph{and} more accurate;
+Greenkhorn's speedup over plain Sinkhorn in the small-$\varepsilon$ regime
+needed for $\le 1\%$ quality is only $\sim$1--$1.5\times$ on most cells,
+and it inherits the full regularization bias. We documented how tight a
+textbook one-pass dual clip is as a certificate for a $k$NN-pool solve
+across 15 instance families, and showed in a multi-robot sanity check that
+where an integer plan is the deliverable, approximate OT is a tax on both
+time and quality. The Sinkhorn family's large-$n$ dense regime stands
+untouched, and the boundary between exact and approximate is now measured.
 
 \begin{thebibliography}{20}
 
@@ -825,7 +912,7 @@ Journal of Research of the National Bureau of Standards, Section~B,
 
 \bibitem{birkhoff1946}
 G.~Birkhoff. \emph{Tres observaciones sobre el algebra lineal}.
-Anales de la Universidad Nacional de Educaci\'on J.\,P.~Bustos, 1946.
+Revista de la Universidad Nacional de Tucum\'an, Serie~A, 5:147--151, 1946.
 
 \bibitem{schrijver2003}
 A.~Schrijver. \emph{Combinatorial Optimization: Polyhedra and Efficiency}.
@@ -834,7 +921,7 @@ Springer, 2003.
 \bibitem{jonker1987}
 R.~Jonker and A.~Volgenant. \emph{A shortest augmenting path algorithm for
 dense and sparse linear assignment problems}. Computing, 38(4):325--340,
-1987. (Earlier version in WADS, LNCS~246, Springer, 1987.)
+1987.
 
 \bibitem{blossomv}
 V.~Kolmogorov. \emph{Blossom V: a new implementation of Edmonds' algorithm
@@ -842,13 +929,13 @@ for minimum weight perfect matching}. Mathematical Programming Computation,
 1(1):43--67, 2009. Code: \url{https://github.com/orkz/BlossomV}.
 
 \bibitem{blossomvi}
-G.~Arkhipov and V.~Kolmogorov. \emph{Blossom VI: A Practical Minimum Weight
+P.~Arkhipov and V.~Kolmogorov. \emph{Blossom VI: A Practical Minimum Weight
 Perfect Matching Algorithm}. arXiv:2604.20351 (to appear, ALENEX 2027),
 2026.
 
 \bibitem{sinkknopp1967}
 R.~Sinkhorn and P.~Knopp. \emph{Concerning nonnegative matrices and doubly
-stochastic matrices}. Pacific Journal of Mathematics, 22(2):343--348, 1967.
+stochastic matrices}. Pacific Journal of Mathematics, 21(2):343--348, 1967.
 
 \bibitem{cuturi2013}
 M.~Cuturi. \emph{Sinkhorn distances: lightspeed computation of optimal
@@ -871,20 +958,15 @@ problem with applications}. arXiv:2501.06247, 2025.
 C.~Villani. \emph{Optimal Transport: Old and New}. Grundlehren 338,
 Springer, 2009.
 
-\bibitem{bertsekas1989}
+\bibitem{bertsekas1988}
 D.~P.~Bertsekas. \emph{The auction algorithm: a distributed relaxation
 method for the assignment problem}. Annals of Operations Research,
-29:69--104, 1990.
+14:105--123, 1988. (Tutorial introduction.)
 
 \bibitem{gerkey2004}
 B.~P.~Gerkey and M.~J.~Matari\'c. \emph{A formal analysis and taxonomy of
 task allocation in multi-robot systems}. International Journal of Robotics
-Research, 23(4):493--512, 2004.
-
-\bibitem{christofides1976}
-N.~Christofides. \emph{Worst-case analysis of a new heuristic for the
-travelling salesman problem}. Technical report, School of Graduate Studies
-in Business Administration, Carnegie-Mellon University, 1976.
+Research, 23(9):939--954, 2004.
 
 \bibitem{schmitzer2016}
 B.~Schmitzer. \emph{A sparse multiscale algorithm for dense optimal
@@ -906,38 +988,17 @@ R.~Flamary et al. \emph{POT: Python Optimal Transport}.
 Journal of Machine Learning Research, 22(78):1--8, 2021.
 \url{https://pythonot.github.io}.
 
+\bibitem{lin2022}
+T.~Lin, N.~Ho, and M.~Jordan. \emph{On the efficiency of entropic
+regularized algorithms for optimal transport}. Journal of Machine Learning
+Research, 23(20):1--56, 2022.
+
 \end{thebibliography}
 
 \appendix
 
 \section{Additional proofs and details}
 \label{app:proofs}
-
-\subsection{Feasibility restoration for the entropic floor}
-\label{app:restoration}
-Theorem~\ref{thm:ent} assumes $P$ is exactly feasible. Suppose instead
-$P\ge 0$ with $\lVert P\mathbf{1}-\mathbf{1}\rVert_\infty\le\delta$ and
-$\lVert P^{\mathsf T}\mathbf{1}-\mathbf{1}\rVert_\infty\le\delta$. Let
-$r=P\mathbf{1}-\mathbf{1}$, $c=P^{\mathsf T}\mathbf{1}-\mathbf{1}$
-($\mathbf{1}^{\mathsf T}r=\mathbf{1}^{\mathsf T}c$). There exists a matrix
-$\Delta$ with $\Delta\mathbf{1}=-r$, $\Delta^{\mathsf T}\mathbf{1}=-c$
-(e.g.\ via the transportation problem on the residuals, which is feasible
-exactly when $\mathbf{1}^{\mathsf T}r=0$); one may take
-$\lVert\Delta\rVert_1\le 2n\delta$ (send each row's excess to a deficit
-column). Then $\tilde P=P+\Delta\ge 0$ is feasible for
-$\delta\le \min_{ij}P_{ij}$ and
-\[
-\bigl|\langle C,\Delta\rangle\bigr| \le \lVert C\rVert_\infty
-\lVert\Delta\rVert_1 \le \lVert C\rVert_\infty\, 2n\delta,
-\]
-while the entropy term changes by
-$\varepsilon\sum_{ij}(\tilde P_{ij}\log\tilde P_{ij}-P_{ij}\log P_{ij})
-= O(\varepsilon n\delta)$, since $x\log x$ has bounded slope on
-$[\delta/2,1]$ apart from entries where both $P_{ij},\tilde P_{ij}\le\delta$
-(contributing $O(\varepsilon n\delta|\log\delta|)$ in the worst case). With
-$\delta=10^{-9}$, $n\le 2000$, $\lVert C\rVert_\infty\le 141.5$ this is
-$\lesssim 6\times 10^{-4}$ absolute---negligible against costs of
-$O(10^3)$ (Remark~\ref{rem:num}).
 
 \subsection{Worked example of the certificate}
 \label{app:example}
@@ -957,17 +1018,18 @@ $\alpha=(7,18,33,20)$, $\beta=(18,7,26,-7)$, with
 $\sum\alpha+\sum\beta=122=\mathrm{UB}$ and
 $\alpha_i+\beta_j\le C_{ij}$ on every pool edge.
 
-\emph{The raw dual is not dense-feasible.} On the two off-pool edges,
+\emph{The raw dual is not dense-feasible.} Among the six off-pool edges
+$\{(1,1),(1,4),(2,3),(3,1),(3,3),(4,4)\}$, two are violated:
 $\alpha_3+\beta_1=33+18=51>49=C_{31}$ and
-$\alpha_3+\beta_3=33+26=59>58=C_{33}$. (Its objective $122$ even exceeds
-the dense optimum---infeasible duals can.) The dense optimum is
-$\mathrm{OPT}=121$ (true pool gap $0.83\%$).
+$\alpha_3+\beta_3=33+26=59>58=C_{33}$. (The dual objective of $122$ even
+exceeds the dense optimum---infeasible duals can.) The dense optimum is
+$\mathrm{OPT}=121$ (true pool gap $0.83\%$), attained by the matching
+$(1,2),(2,4),(3,3),(4,1)$ of costs $14+11+58+38=121$.
 
 \emph{Repair.} Option~B (clip the $\alpha$ side against the original
 $\beta$): $\hat\alpha_3=\min\bigl(33,\min_j(C_{3j}-\beta_j)\bigr)
 =\min(33,\,49-18,\,40-7,\,58-26,\,26+7)=31$; the other $\alpha_i$ need no
-clipping (each already satisfies all dense constraints). Objective:
-$(7+18+31+20)+(18+7+26-7)=120$. Option~A (clip
+clipping. Objective: $(7+18+31+20)+(18+7+26-7)=120$. Option~A (clip
 the $\beta$ side against the original $\alpha$) gives
 $\hat\beta=(16,7,25,-7)$ with objective $119$. Taking the max
 (Theorem~\ref{thm:cert}),
@@ -975,10 +1037,7 @@ $\hat\beta=(16,7,25,-7)$ with objective $119$. Taking the max
 \mathrm{LB}=120\;\le\;\mathrm{OPT}=121\;\le\;\mathrm{UB}=122,
 \]
 so the pool solution is certified within $\frac{122-120}{122}=1.64\%$
-(width) of the dense optimum---here computed by hand; in the implementation
-it is two $O(n^2)$ min-passes. Note that the two one-sided options
-differ ($120$ vs $119$), illustrating Remark~\ref{rem:order}.
-
+(width) of the dense optimum. In code the repair is two $O(n^2)$ min-passes.
 
 \subsection{Monotonicity of the upper bound in $k$}
 Since $E_k\subseteq E_{k'}$ for $k\le k'$, every $k$-pool matching is a
@@ -998,12 +1057,12 @@ the pool dual changes with $k$).
 \item \textbf{clustered}: centers $c_a=100\cdot\mathrm{rng.random}((8,2))$;
   each side assigns point $i$ to center $a=i\bmod 8$ with
   $x_i=c_{a}+\mathcal N(0,8^2 I)$; the target centers are
-  $c'_a=c_a+\mathcal N(0,3^2 I)$ with the same assignment (target-center
-  jitter $\sigma=3$, matching the description in \S\ref{sec:setup}).
+  $c'_a=c_a+\mathcal N(0,3^2 I)$ with the same assignment pattern (target
+  jitter $\sigma=3$).
 \item \textbf{1-D+noise}: $t_i\sim U[0,100]$;
-  $x_i=(t_i+\mathcal N(0,2),\,\mathcal N(0,2))$; independently
+  $x_i=(t_i+\mathcal N(0,2^2),\,\mathcal N(0,2^2))$; independently
   $s_j\sim U[0,100]$ from $\texttt{default\_rng(seed+1000)}$;
-  $y_j=(s_j+\mathcal N(0,2),\,\mathcal N(0,2))$.
+  $y_j=(s_j+\mathcal N(0,2^2),\,\mathcal N(0,2^2))$.
 \end{itemize}
 
 \subsection{Algorithms}
@@ -1013,11 +1072,15 @@ the pool dual changes with $k$).
 \Require cost $C\in\mathbb R^{n\times n}$, $\varepsilon>0$, tolerance $\tau$
 \State $u\leftarrow 0$, $v\leftarrow 0$
 \Repeat
-  \For{$i=1,\dots,n$}\State $u_i\leftarrow u_i-\varepsilon\,\mathrm{LSE}_j\bigl((v_j-C_{ij})/\varepsilon\bigr)$\EndFor
-  \For{$j=1,\dots,n$}\State $v_j\leftarrow v_j-\varepsilon\,\mathrm{LSE}_i\bigl((u_i-C_{ij})/\varepsilon\bigr)$\EndFor
+  \For{$i=1,\dots,n$}
+    \State $u_i\;\leftarrow\; -\varepsilon\,\mathrm{LSE}_j\bigl((v_j-C_{ij})/\varepsilon\bigr)$
+  \EndFor
+  \For{$j=1,\dots,n$}
+    \State $v_j\;\leftarrow\; -\varepsilon\,\mathrm{LSE}_i\bigl((u_i-C_{ij})/\varepsilon\bigr)$
+  \EndFor
   \State $P_{ij}\leftarrow \exp((u_i+v_j-C_{ij})/\varepsilon)$
 \Until $\max_i|(P\mathbf 1)_i-1|+\max_j|(P^{\mathsf T}\mathbf 1)_j-1|\le\tau$ \emph{or cost plateau}
-\State \Return $P$, value $\langle C,P\rangle+\varepsilon\sum P_{ij}\log P_{ij}$
+\State \Return $P$, value $\sum_i u_i+\sum_j v_j$ ($=\langle C,P\rangle+\varepsilon\sum P_{ij}\log P_{ij}$ at convergence)
 \end{algorithmic}
 \end{algorithm}
 
@@ -1030,8 +1093,12 @@ residual metric $\rho(a,b)=b-a+a\log(a/b)$
 \Repeat
   \State $I\leftarrow\arg\max_i \rho(1,(A\mathbf 1)_i)$;
   $J\leftarrow\arg\max_j \rho(1,(\mathbf 1^{\mathsf T}A)_j)$
-  \If{$\rho_I>\rho_J$}\State $x_I\leftarrow x_I+\log(1/(A\mathbf 1)_I)$\Else
-  \State $y_J\leftarrow y_J+\log(1/(\mathbf 1^{\mathsf T}A)_J)$\EndIf
+  \If{$\rho_I>\rho_J$}
+    \State $x_I\leftarrow x_I+\log(1/(A\mathbf 1)_I)$
+  \Else
+    \State $y_J\leftarrow y_J+\log(1/(\mathbf 1^{\mathsf T}A)_J)$
+    \Comment{break ties toward rows when $\rho_I=\rho_J$}
+  \EndIf
   \State update $A$ and the marginals of the touched line ($O(n)$)
 \Until marginal tolerance or cost plateau
 \end{algorithmic}
@@ -1045,21 +1112,24 @@ integer plan, hence $\ge \mathrm{OPT}$).
 \textbf{Pool construction} (\texttt{knn\_pool}): for each source $i$, keep
 the $k$ targets with smallest $C_{ij}$ (and symmetrically for each target);
 the pool is the union. If the pool has no perfect matching (Hall's
-condition fails, e.g.\ $k=1$), the solver reports infeasible.
+condition fails, e.g.\ $k=1$), the solver reports infeasible. The
+repository version uses $k$ per side (corrected); the cached results were
+generated by a version that used $k+1$ per side (see Table~\ref{tab:pool}).
 
 \textbf{Certificate} (\texttt{pool\_certified}):
 UB/perm/dual from \texttt{blossom\_pool\_duals};
 $\mathrm{LB}_1$ from Proposition~\ref{prop:repair} (max of the two
-one-sided repairs); $\mathrm{LB}_2=W(0.05\,\overline C)$ from one converged
-Sinkhorn run per configuration (shared across $k$);
-$\mathrm{LB}=\max(\mathrm{LB}_1,\mathrm{LB}_2)$.
+one-sided repairs); $\mathrm{LB}_2=\sum_i u_i+\sum_j v_j$ from a converged
+Sinkhorn run at $\varepsilon=0.05\,\overline C$ per configuration (shared
+across $k$); $\mathrm{LB}=\max(\mathrm{LB}_1,\mathrm{LB}_2)$.
 
 \subsection{Parameters}
-Marginal tolerance $10^{-9}$ (application hook: $10^{-7}$, the plan is
-hardened anyway); time caps $400\,$s (dense grid), $240\,$s (certificate
-study Sinkhorn runs); Blossom VI pool timeout $120\,$s (never hit); costs
-rounded to milliunits for the integer solvers; all timings single-threaded
-wall time, same machine, same process order.
+Marginal tolerance $10^{-9}$ on the dense grid (application hook: $10^{-7}$,
+since an integer plan is produced regardless); time caps $400\,$s (dense
+grid), $240\,\mathrm{s}$ (certificate-study Sinkhorn runs); Blossom~VI pool
+timeout $120\,\mathrm{s}$ (never hit); costs rounded to milliunits for the
+integer solvers; all timings single-threaded wall time, same machine, same
+process order, single run per cell.
 
 \section{Reproduction}
 \label{app:repro}
@@ -1069,16 +1139,15 @@ available at
 \url{https://github.com/dimkadimon/OT-Blossom}.
 The repository layout:
 \begin{verbatim}
-ot-study/otlib.py                  # sinkhorn, greenkhorn, exact, pool,
-                                   # dual repair, entropic floor, certificate
+ot-study/otlib.py                  # exact (LAPJV, Blossom pool, 1-D quantile),
+                                   # sinkhorn, greenkhorn, dual repair, certificate
 ot-study/run_ot_study.py           # Part A/B tables -> results/ot_study.md
-ot-study/run_greenkhorn_study.py   # A.2b, A.3, Part D -> results/ot_study.md
-ot-study/run_pool_cert_study.py    # certificate study (15 x 3 cells)
-                                   # -> results/pool_cert.md, asserts invariants
-ot-study/app_hook_robots.py        # multi-robot study -> results/app_hook.md
+ot-study/run_greenkhorn_study.py   # Greenkhorn-vs-Sinkhorn sweep
+ot-study/run_pool_cert_study.py    # 15-config x 3-k certificate study
+ot-study/app_hook_robots.py        # multi-robot task-allocation experiment
 paper/                             # LaTeX source and figs for this paper
 \end{verbatim}
-Each script caches its results (JSON) and re-renders in seconds; a full
+Each script caches results (JSON) and re-renders in seconds; a full
 cold re-run takes $\approx 25\,\mathrm{min}$ (Greenkhorn grid),
 $\approx 20\,\mathrm{min}$ (certificate study), $\approx 6\,\mathrm{min}$
 (application hook) on the testbed. The Blossom~VI binary used for pool

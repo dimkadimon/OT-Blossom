@@ -58,12 +58,22 @@ def exact_lapjv(C):
 
 
 def knn_pool(C, k):
-    """Symmetric k-NN pool as a boolean mask (kNN of both sides)."""
+    """Symmetric k-NN pool as a boolean mask (kNN of each row UNION kNN of each
+    column).  Each side keeps its k smallest-cost edges, so |E_k| <= 2kn.
+
+    Note: the original experiments reported in the paper were produced by an
+    earlier version of this function that used argpartition(C[i], k+1)[:k+1]
+    (i.e. k+1 neighbors per side before the symmetric union).  The cached
+    JSON result files in results/ therefore correspond to per-side budgets of
+    k+1 at the labelled k, and the edge counts in Table 5 reflect that.  The
+    function below is the corrected k-per-side version; the cached tables are
+    preserved as historical run artifacts.
+    """
     n = C.shape[0]
     k = min(k, n - 1)
     keep = np.zeros((n, n), dtype=bool)
     for i in range(n):
-        keep[i, np.argpartition(C[i], k + 1)[:k + 1]] = True
+        keep[i, np.argpartition(C[i], k)[:k]] = True
     return keep | keep.T
 
 
