@@ -23,7 +23,8 @@
 \DeclareMathOperator*{\argmax}{arg\,max}
 
 \title{\bf Exact Optimal Transport by Matching:\\
-Benchmarks, Duality Certificates, and a Multi-Robot Application}
+Benchmarks, Duality Certificates, and a Multi-Robot Application\\[4pt]
+\normalfont\small Version~1.3 (revision of \today)}
 
 \author{
 Dmitry Kamenetsky
@@ -31,7 +32,7 @@ Dmitry Kamenetsky
 \small\texttt{dkamenetsky@gmail.com}
 }
 
-\date{\today}
+\date{}
 
 \begin{document}
 \maketitle
@@ -59,9 +60,9 @@ matching is faster \emph{and} strictly more accurate than either approximate
 method throughout the moderate-$n$ regime: $0.01\,\mathrm{s}$ at $n=500$ to
 $11.5\,\mathrm{s}$ at $n=8000$; to hit a $\le 1\%$ quality target, a rough
 power-law extrapolation of Greenkhorn's measured step counts puts the
-approximate cost at $\sim\!10$--$\sim\!100\,\mathrm{min}$ for Greenkhorn
-(factors of roughly $5{\times}10^2$--$6{\times}10^4$ over exact; plain
-Sinkhorn is $20$--$500\times$ slower still). Greenkhorn, measured rather than assumed, is within
+approximate cost at $\sim\!10$--$\sim\!80\,\mathrm{min}$ for Greenkhorn
+(factors of roughly $4{\times}10^2$--$6{\times}10^4$ over exact; plain
+Sinkhorn is $20$--$650\times$ slower still). Greenkhorn, measured rather than assumed, is within
 $0.93\times$--$5.0\times$ of plain Sinkhorn on the measured cells and
 converges to the same entropic plan, so the quality gap is a regularization
 bias shared by both. (ii)~\emph{A simple certificate}: given a $k$NN-pool
@@ -109,7 +110,8 @@ Jonker--Volgenant routine for dense solves.)
 study, dense exact assignment takes $0.01\,\mathrm{s}$ at $n=500$ and
 $11.5\,\mathrm{s}$ at $n=8000$; exploiting local structure, a $k$NN-pool
 sparse solve takes $0.18\,\mathrm{s}$ at $n=2000$ with a $0.032\%$ gap to
-the dense optimum; 1-D instances reach $n=10^6$ in $0.11\,\mathrm{s}$.
+the dense optimum (Table~5, per-side budget $k{+}1$, see~\S\ref{sec:pool});
+1-D instances reach $n=10^6$ in $0.11\,\mathrm{s}$.
 \end{enumerate}
 
 The question this paper answers is empirical: \emph{when does exact
@@ -130,8 +132,9 @@ cheaply computable bound on its distance from the dense optimum; and (c) an
   (Sections~\ref{sec:setup}--\ref{sec:results}). The headline empirical
   finding is that Greenkhorn's measured speedup over plain Sinkhorn in the
   small-$\varepsilon$ regime needed for $\le 1\%$ accuracy is only
-  $1.0$--$1.5\times$ on most cells (with one $5\times$ outlier), while the
-  regularization bias is identical.
+  $1.0$--$1.5\times$ on most cells (with one $5\times$ outlier, over the
+  cells where vanilla converged; ratios on the two capped cells are
+  $4.3$--$4.4\times$), while the regularization bias is identical.
 \item A \emph{gap certificate} for the pool solver requiring no dense solve:
   a one-sided $O(n^2)$ clip of the pool matching dual to a dense-feasible
   dual (Proposition~\ref{prop:repair}, Theorem~\ref{thm:cert})---the
@@ -173,7 +176,7 @@ novelty for the clip itself. The log-domain Sinkhorn potentials are dual
 feasible for the assignment LP at every iterate (Theorem~\ref{thm:ent}), a
 fact standard in the OT literature; an entropy-corrected variant that gives
 a quantitative bound on the gap is described in the lecture notes
-accompanying \cite{peyre2019}.
+accompanying \cite{peyre2019}.\label{pg:clip}
 
 \section{Preliminaries}
 \label{sec:prelim}
@@ -422,8 +425,16 @@ against $\beta$ to get $\hat\alpha$, then clip $\beta$ against
 $\hat\alpha$. Because the second pass only lowers entries of $\beta$
 ($\tilde\beta_j\le\beta_j$), we have $\sum_i\hat\alpha_i+\sum_j\tilde\beta_j
 \le \sum_i\hat\alpha_i+\sum_j\beta_j$, so $S$ is \emph{always dominated}
-by $B$; it is incomparable with $A$ (random trials find $S>A$ and $S<A$
-each occurring roughly $20\%$ of the time). Since
+by $B$; it is incomparable with $A$, as explicit $n=2$ witnesses
+show. With $C=\bigl[\begin{smallmatrix}7&12\\13&2\end{smallmatrix}\bigr]$,
+$\alpha=(-10,9)$, $\beta=(14,7)$: one-sided repairs give
+$\hat\beta=(4,-7)$, $\hat\alpha=(-10,-5)$ with objectives $A=-4$, $B=6$,
+and a second clip leaves $\tilde\beta=(14,7)$ so $S=6>A$.
+With $C=\bigl[\begin{smallmatrix}17&6\\4&10\end{smallmatrix}\bigr]$,
+$\alpha=(16,15)$, $\beta=(15,-5)$:
+$\hat\beta=(-11,-10)$, $\hat\alpha=(2,-11)$ give $A=10$, $B=1$,
+and $S=1<A$. (Random trials on larger instances find $S>A$ and $S<A$
+about equally often, $\approx 20\%$ each.) Since
 $\max(A,B)\ge B\ge S$, the max-of-two rule \eqref{eq:lb1} is never worse
 than the sequential variant while costing the same $O(n^2)$ work, and we
 use it throughout.
@@ -466,8 +477,9 @@ gives an entropy contribution on the order of $-\varepsilon n\log n\approx -4\ti
 far below OPT. Better entropy-corrected variants
 $\mathrm{LB}_{\varepsilon}=D_{\varepsilon}-\varepsilon H(a)-\varepsilon H(b)$
 that quantitatively bound $0\le\mathrm{OPT}-\mathrm{LB}_{\varepsilon}\le\delta$
-are known \cite[\S4.1]{peyre2019} and would strengthen the bound at small
-extra cost; we leave them to future work.
+are described in the lecture notes accompanying \cite{peyre2019}
+(see also the discussion on p.~\pageref{pg:clip} above) and would
+strengthen the bound at small extra cost; we leave them to future work.
 \end{remark}
 
 \paragraph{Combined certificate.} We report
@@ -608,9 +620,13 @@ $n$ & $t(\mathrm{exact})$ & $t(\mathrm{Sinkhorn\ at\ }f^*)$ & $t(\mathrm{Greenkh
 \end{tabular}
 \caption{Wall time to reach $1\%$ gap for Greenkhorn, extrapolated as
   described in the text (rough order-of-magnitude, deliberately rounded up
-  to one significant figure; see caveats). The Sinkhorn column is a
-  coarser order-of-magnitude estimate assuming Sinkhorn is
-  $20$--$500\times$ slower than Greenkhorn (the measured range).}
+  to one or two significant figures; see caveats). The Sinkhorn column is a
+  coarser order-of-magnitude estimate: per-step work scales as $O(n^2)$ for
+  Sinkhorn vs $O(n)$ for Greenkhorn on the kNN support, implying
+  Sinkhorn is $20$--$650\times$ slower than Greenkhorn at this~$f^*$
+  (extrapolated; the actually measured Greenkhorn/vanilla ratios in
+  Table~\ref{tab:ghead} are $0.93$--$5.0\times$ on the cells that
+  converged).}
 \label{tab:target}
 \end{table}
 
@@ -658,6 +674,7 @@ percent-level gaps we report.}
 \end{table}
 
 \subsection{The pool solver and its certificate}
+\label{sec:pool}
 Table~\ref{tab:pool} shows the pool solver on the dense $n=2000$ reference
 (quality vs $k$); Figure~\ref{fig:crossover} situates it in the
 quality--time plane against the approximate baselines.
@@ -671,13 +688,17 @@ original code), i.e.\ the reported runs correspond to a per-side budget of
 $k+1$; the edge counts match $2(k+1)n-(k+1)^2$ to within the expected
 random-kNN overlap. The corrected $k$-per-side implementation is shipped
 in the repository (see \texttt{otlib.py::knn\_pool}); the cached tables
-below reflect the original runs and are preserved for reproducibility
-rather than re-run, because the Blossom~VI binary used in the original
-study is not redistributed. Spot checks at $k=32$ with the corrected
-driver on the same instances produce certificate widths within $5\%$ of
-the reported values (the ordering of results is unchanged). At small
-effective $k$ the pool can be Hall-infeasible (e.g.\ at $k=1$), in which
-case the solver reports infeasible.
+below are from the original Blossom~VI runs of that driver (Blossom~VI
+is available directly from its authors \cite{blossomvi}, not bundled
+with this repository, so we preserve the cached results rather than
+re-run them in place). Independent verification with a redistributable
+bipartite solver (SciPy's \texttt{linear\_sum\_assignment} on the pool
+subgraph) reproduces every reported pool-UB cost to within rounding.
+Spot checks at $k=32$ with the corrected $k$-per-side driver on the
+same instances produce certificate widths within $5\%$ of the reported
+values (the ordering of results is unchanged). At small effective $k$
+the pool can be Hall-infeasible (e.g.\ at $k=1$), in which case the
+solver reports infeasible.
 
 \begin{table}[t]
 \centering
@@ -1176,9 +1197,16 @@ paper/                             # LaTeX source and figs for this paper
 Each script caches results (JSON) and re-renders in seconds; a full
 cold re-run takes $\approx 25\,\mathrm{min}$ (Greenkhorn grid),
 $\approx 20\,\mathrm{min}$ (certificate study), $\approx 6\,\mathrm{min}$
-(application hook) on the testbed. The Blossom~VI binary used for pool
-solves is available from its authors \cite{blossomvi}; our driver uses
-the edge-list interface with the \texttt{--duals} flag.
+(application hook) on the testbed. Dense exact, Sinkhorn/Greenkhorn,
+1-D, and application-hook scripts run on SciPy + NumPy alone. The
+pool-certificate script uses Blossom~VI's dual-output interface
+(\texttt{--duals} flag) and requires the Blossom~VI binary, which is
+available directly from its authors \cite{blossomvi} (it is not bundled
+with this repository); the cached JSON results in
+\texttt{ot-study/results/pool\_cert.json} are included so that tables
+and figures regenerate without it, and the pool upper-bound costs can
+be verified independently with any bipartite LAP solver on the same
+$k$NN subgraph.
 
 \section{Prompts that directed this work}
 \label{app:prompts}
@@ -1220,7 +1248,7 @@ complete the remaining two items: a pool solver with a gap certificate,
 and an application hook where the discrete plan is the deliverable.
 \item (verbatim, this paper) Instruction to write up the work as a
 professional arXiv paper with references, proofs, and an appendix
-summarizing/summarizing the prompts used; direction to disclose that the
+summarizing the prompts used; direction to disclose that the
 algorithm design, coding, experiments, analysis, and writing were
 performed by the AI agent under D.~K.'s direction.
 \end{enumerate}
