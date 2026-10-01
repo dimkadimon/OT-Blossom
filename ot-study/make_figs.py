@@ -28,15 +28,29 @@ for n in ns:
     green_t.append(g.get("t", np.nan))
 
 # Rough extrapolation to 1% gap. Values are reported explicitly in
-# Table 3 of the paper (rounded to one or two significant figures) and
-# are derived from a power-law fit to Greenkhorn's step count (f*≈9e-4,
-# ~1.7e7 steps at f*), with per-step time calibrated to match the
-# measured empirical scaling rather than a pure O(n) ansatz (Greenkhorn
-# per-step cost in practice grows slightly sub-linearly in n because
-# the incremental marginal bookkeeping gets amortized over fewer
-# non-trivial updates at larger n). We plot the same rounded values
-# that Table 3 reports so figure and table are consistent. Convert to
+# Table 3 of the paper (rounded to one or two significant figures). For
+# visual consistency the dashed extrapolation lines continue the
+# empirical log-log slope observed for f=0.01 on the measured points
+# (Sinkhorn ~n^1.9, Greenkhorn ~n^1.6), and star markers at each n
+# indicate the f* points from Table 3 (which additionally account for
+# extra iterations needed at smaller regularization). Convert to
 # seconds to match the measured-series units.
+ns_arr = np.array(ns, dtype=float)
+mask_s = ~np.isnan(sink_t_arr := np.array(sink_t, dtype=float))
+mask_g = ~np.isnan(green_t_arr := np.array(green_t, dtype=float))
+slope_V = np.polyfit(np.log(ns_arr[mask_s]), np.log(sink_t_arr[mask_s]), 1)[0]
+slope_G = np.polyfit(np.log(ns_arr[mask_g]), np.log(green_t_arr[mask_g]), 1)[0]
+
+# Anchor the slope-continuation lines at the largest-n f=0.01 measured
+# point for each method and extend with the empirical slope.
+n_anchor_V, t_anchor_V = ns_arr[mask_s][-1], sink_t_arr[mask_s][-1]
+n_anchor_G, t_anchor_G = ns_arr[mask_g][-1], green_t_arr[mask_g][-1]
+ns_slope = np.array([n_anchor_V, 8000], dtype=float)
+tV_slope = t_anchor_V * (ns_slope/n_anchor_V)**slope_V
+ns_slope_G = np.array([n_anchor_G, 8000], dtype=float)
+tG_slope = t_anchor_G * (ns_slope_G/n_anchor_G)**slope_G
+
+# f* points (Table 3)
 ns_ext = np.array([500,1000,2000,4000,8000], dtype=float)
 tG_ext = np.array([10, 12, 20, 40, 80], dtype=float) * 60.0       # seconds
 tV_ext = np.array([200, 700, 3000, 10000, 50000], dtype=float) * 60.0
@@ -44,12 +58,14 @@ tV_ext = np.array([200, 700, 3000, 10000, 50000], dtype=float) * 60.0
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4.6))
 
 ax1.loglog(ns, exact_t, "o-", color="C2", lw=2, label="Exact (LAPJV)")
-ax1.loglog(ns, sink_t, "s-", color="C0", lw=2, label="Sinkhorn (f=0.01)")
-ax1.loglog(ns, green_t, "^-", color="C3", lw=2, label="Greenkhorn (f=0.01)")
-ax1.loglog(ns_ext, tV_ext, "C0--", lw=1.2, alpha=0.7, label="Sinkhorn extrap. to 1%")
-ax1.loglog(ns_ext, tG_ext, "C3:", lw=1.2, alpha=0.7, label="Greenkhorn extrap. to 1%")
+ax1.loglog(ns, sink_t, "s-", color="C0", lw=2, label="Sinkhorn (f=0.01, gap 5–9%)")
+ax1.loglog(ns, green_t, "^-", color="C3", lw=2, label="Greenkhorn (f=0.01, gap 5–9%)")
+ax1.loglog(ns_slope, tV_slope, "C0--", lw=1.2, alpha=0.6)
+ax1.loglog(ns_slope_G, tG_slope, "C3--", lw=1.2, alpha=0.6)
+ax1.loglog(ns_ext, tV_ext, "C0*", ms=10, label="Sinkhorn extrap. to 1%")
+ax1.loglog(ns_ext, tG_ext, "C3*", ms=10, label="Greenkhorn extrap. to 1%")
 ax1.set_xlabel("n"); ax1.set_ylabel("wall time (s)")
-ax1.set_title("Time (log-log)"); ax1.grid(True, which="both", alpha=0.3); ax1.legend(fontsize=8, loc="upper left")
+ax1.set_title("Time (log-log)"); ax1.grid(True, which="both", alpha=0.3); ax1.legend(fontsize=7.5, loc="upper left")
 
 # Quality: gap vs n at f=0.01; include exact (gap=0)
 sink_gap = [A[str(n)].get("f0.0100", {}).get("gap", np.nan) for n in ns]

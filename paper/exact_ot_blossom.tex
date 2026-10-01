@@ -23,7 +23,7 @@
 \DeclareMathOperator*{\argmax}{arg\,max}
 
 \title{\bf Exact Optimal Transport by Matching\\[4pt]
-\normalfont\small Version~1.4 (revision of \today)}
+\normalfont\small Version~1.5 (revision of \today)}
 
 \author{
 Dmitry Kamenetsky
@@ -697,7 +697,10 @@ $n$ & $f$ & gap V \% & $t(V)$ s & gap G \% & $t(G)$ s & steps(G) & $t(V)/t(G)$ \
 \bottomrule
 \end{tabular}
 \caption{Vanilla Sinkhorn (V) vs Greenkhorn (G), uniform seed 7.
-$^\dagger$ 400\,s cap (vanilla did not converge there). All Greenkhorn runs
+$^\dagger$ 400\,s cap (vanilla did not converge there). Times are rounded
+to integer seconds for display; speed ratios in the final column are
+computed from the unrounded wall times (so the $n=500,f=0.05$ row shows
+$10$\,s vs $10$\,s but the ratio is $0.93\times$). All Greenkhorn runs
 stopped on a cost plateau before reaching marginal tolerance $10^{-9}$
 (typical plateau $10^{-6}$--$10^{-3}$); cost agreement $\le 0.04\%$ in every
 cell, which bounds the cost error from early stopping well below the
@@ -787,9 +790,12 @@ cells carry $\mathrm{LB}>0$.}
 \centering
 \includegraphics[width=0.98\textwidth]{figs/crossover.png}
 \caption{Exact (Jonker--Volgenant) vs vanilla Sinkhorn and Greenkhorn on
-the dense uniform grid; dashed/dotted lines are the rough extrapolations
-to the $1\%$ target. Exact is below both approximate curves at every
-measured $n$ in both time and quality.}
+the dense uniform grid (seed~7). Solid lines are measured wall times at
+$f=0.01$ where each approximate method produces a transport plan $5$--$9\%$
+above the exact optimum. Dashed lines continue the empirical log-log
+slope of those measured curves; star markers are the rough Table~3
+extrapolation to the $1\%$ quality target. Exact is below both
+approximate curves at every measured $n$ in both time and quality.}
 \label{fig:crossover}
 \end{figure}
 
@@ -1129,6 +1135,7 @@ method for the assignment problem}. Annals of Operations Research,
 
 \subsection{Worked example of the certificate}
 \label{app:example}
+{\sloppypar
 Consider
 \[
 C=\begin{pmatrix}
@@ -1142,29 +1149,33 @@ with the $2$-NN pool (the union of each row's and each column's two
 cheapest edges; 10 of the 16 edges). The pool solver returns the matching
 of cost $\mathrm{UB}=122$ and the pool dual
 $\alpha=(7,18,33,20)$, $\beta=(18,7,26,-7)$, with
-$\sum\alpha+\sum\beta=122=\mathrm{UB}$ and
+$\sum_i\alpha_i+\sum_j\beta_j=122=\mathrm{UB}$ and
 $\alpha_i+\beta_j\le C_{ij}$ on every pool edge.
 
 \emph{The raw dual is not dense-feasible.} Among the six off-pool edges
 $\{(1,1),(1,4),(2,3),(3,1),(3,3),(4,4)\}$, two are violated:
-$\alpha_3+\beta_1=33+18=51>49=C_{31}$ and
-$\alpha_3+\beta_3=33+26=59>58=C_{33}$. (The dual objective of $122$ even
-exceeds the dense optimum---infeasible duals can.) The dense optimum is
-$\mathrm{OPT}=121$ (true pool gap $0.83\%$), attained by the matching
-$(1,2),(2,4),(3,3),(4,1)$ of costs $14+11+58+38=121$.
+$\alpha_3+\beta_1=51>49=C_{31}$ and $\alpha_3+\beta_3=59>58=C_{33}$.
+(The dual objective of $122$ even exceeds the dense optimum---infeasible
+duals can.) The dense optimum is $\mathrm{OPT}=121$ (true pool gap
+$0.83\%$), attained by the matching $(1,2),(2,4),(3,3),(4,1)$ (costs
+$14+11+58+38=121$).
 
 \emph{Repair.} Option~B (clip the $\alpha$ side against the original
-$\beta$): $\hat\alpha_3=\min\bigl(33,\min_j(C_{3j}-\beta_j)\bigr)
-=\min(33,\,49-18,\,40-7,\,58-26,\,26+7)=31$; the other $\alpha_i$ need no
-clipping. Objective: $(7+18+31+20)+(18+7+26-7)=120$. Option~A (clip
-the $\beta$ side against the original $\alpha$) gives
-$\hat\beta=(16,7,25,-7)$ with objective $119$. Taking the max
-(Theorem~\ref{thm:cert}),
+$\beta$):
+\[
+\hat\alpha_3=\min\Bigl(33,\min_j(C_{3j}-\beta_j)\Bigr)
+=\min(33,\,49-18,\,40-7,\,58-26,\,26+7)=31;
+\]
+the other $\alpha_i$ need no clipping. Objective:
+$(7+18+31+20)+(18+7+26-7)=120$. Option~A (clip the $\beta$ side against
+the original $\alpha$) gives $\hat\beta=(16,7,25,-7)$ with objective
+$119$. Taking the max (Theorem~\ref{thm:cert}),
 \[
 \mathrm{LB}=120\;\le\;\mathrm{OPT}=121\;\le\;\mathrm{UB}=122,
 \]
 so the pool solution is certified within $\frac{122-120}{122}=1.64\%$
 (width) of the dense optimum. In code the repair is two $O(n^2)$ min-passes.
+\par}
 
 \subsection{Monotonicity of the upper bound in $k$}
 Since $E_k\subseteq E_{k'}$ for $k\le k'$, every $k$-pool matching is a
@@ -1196,38 +1207,48 @@ the pool dual changes with $k$).
 \begin{algorithm}[h]
 \caption{Log-domain Sinkhorn (vanilla), after~\cite{sinkknopp1967,cuturi2013}}\label{alg:sink}
 \begin{algorithmic}[1]
-\Require cost $C\in\mathbb R^{n\times n}$, $\varepsilon>0$, tolerance $\tau$
+\Require cost $C\in\mathbb R^{n\times n}$, $\varepsilon>0$, marginal
+  tolerance $\tau$; terminate early on a cost plateau (see text).
 \State $u\leftarrow 0$, $v\leftarrow 0$
 \Repeat
-  \For{$i=1,\dots,n$}
+  \For{$i=1,\dots,n$}\Comment{row pass}
     \State $u_i\;\leftarrow\; -\varepsilon\,\mathrm{LSE}_j\bigl((v_j-C_{ij})/\varepsilon\bigr)$
   \EndFor
-  \For{$j=1,\dots,n$}
+  \For{$j=1,\dots,n$}\Comment{column pass}
     \State $v_j\;\leftarrow\; -\varepsilon\,\mathrm{LSE}_i\bigl((u_i-C_{ij})/\varepsilon\bigr)$
   \EndFor
   \State $P_{ij}\leftarrow \exp((u_i+v_j-C_{ij})/\varepsilon)$
-\Until $\max_i|(P\mathbf 1)_i-1|+\max_j|(P^{\mathsf T}\mathbf 1)_j-1|\le\tau$ \emph{or cost plateau}
-\State \Return $P$, value $\sum_i u_i+\sum_j v_j$ ($=\langle C,P\rangle+\varepsilon\sum P_{ij}\log P_{ij}$ at convergence)
+  \Comment{so $(P\mathbf 1)_i=\sum_j P_{ij}$ and $(\mathbf 1^{\mathsf T}P)_j=\sum_i P_{ij}$}
+\Until $\max_i|(P\mathbf 1)_i-1|\le\tau$ \textbf{and}
+       $\max_j|(\mathbf 1^{\mathsf T}P)_j-1|\le\tau$, \textbf{or} cost plateau
+\State $W \;\leftarrow\; \sum_i u_i+\sum_j v_j$
+  \Comment{dual value $= \langle C,P\rangle+\varepsilon\sum P_{ij}\log P_{ij}$ at convergence}
+\State \Return $P$, $W$
 \end{algorithmic}
 \end{algorithm}
 
 \begin{algorithm}[h]
 \caption{Greenkhorn (after \cite[Alg.~4]{awr2017})}\label{alg:green}
 \begin{algorithmic}[1]
-\Require $K=\exp(-C/\varepsilon)$ (unnormalized), potentials $x,y=0$,
-residual metric $\rho(a,b)=b-a+a\log(a/b)$
-\State maintain row/column marginals of $A=D(e^x)K D(e^y)$ incrementally
+\Require $K=\exp(-C/\varepsilon)$ (unnormalized Gibbs kernel); potentials
+  $x,y\leftarrow 0$; residual metric $\rho(a,b)=b-a+a\log(a/b)$.
+  ($D(z)$ denotes the diagonal matrix with vector $z$ on the diagonal, so
+  $A=D(e^x)\,K\,D(e^y)$ has entries
+  $A_{ij}=e^{x_i}K_{ij}e^{y_j}=e^{(x_i+y_j-C_{ij})/\varepsilon}$;
+  maintain its row and column marginals incrementally.)
 \Repeat
   \State $I\leftarrow\arg\max_i \rho(1,(A\mathbf 1)_i)$;
-  $J\leftarrow\arg\max_j \rho(1,(\mathbf 1^{\mathsf T}A)_j)$
+         $J\leftarrow\arg\max_j \rho(1,(\mathbf 1^{\mathsf T}A)_j)$
   \If{$\rho_I>\rho_J$}
     \State $x_I\leftarrow x_I+\log(1/(A\mathbf 1)_I)$
+    \Comment{restore row $I$ to sum 1}
   \Else
     \State $y_J\leftarrow y_J+\log(1/(\mathbf 1^{\mathsf T}A)_J)$
-    \Comment{break ties toward rows when $\rho_I=\rho_J$}
+    \Comment{restore column $J$ to sum 1; break ties toward rows}
   \EndIf
-  \State update $A$ and the marginals of the touched line ($O(n)$)
-\Until marginal tolerance or cost plateau
+  \State update the touched row or column of $A$ and its marginals ($O(n)$)
+\Until $\max_i|(A\mathbf 1)_i-1|\le\tau$ and
+       $\max_j|(\mathbf 1^{\mathsf T}A)_j-1|\le\tau$, \textbf{or} cost plateau
 \end{algorithmic}
 \end{algorithm}
 
@@ -1266,8 +1287,8 @@ available at
 \url{https://github.com/dimkadimon/OT-Blossom}.
 The repository layout:
 \begin{verbatim}
-ot-study/otlib.py                  # exact (LAPJV, Blossom pool, 1-D quantile),
-                                   # sinkhorn, greenkhorn, dual repair, certificate
+ot-study/otlib.py                  # exact (LAPJV, Blossom pool, 1-D),
+                                   # sinkhorn, greenkhorn, dual repair, cert
 ot-study/run_ot_study.py           # Part A/B tables -> results/ot_study.md
 ot-study/run_greenkhorn_study.py   # Greenkhorn-vs-Sinkhorn sweep
 ot-study/run_pool_cert_study.py    # 15-config x 3-k certificate study
@@ -1331,6 +1352,37 @@ professional arXiv paper with references, proofs, and an appendix
 summarizing the prompts used; direction to disclose that the
 algorithm design, coding, experiments, analysis, and writing were
 performed by the AI agent under Dmitry Kamenetsky's direction.
+\item (paraphrase, first review pass) Request to fix all issues flagged in
+the first review pass (bug in Remark~1 domination direction, misleading
+coordinate-ascent claim, entropic sign-convention paragraph, Theorem~2
+proof gaps, abstract/table number drift, AmE spelling, proper Bertsekas
+1992 citation, AI disclosure, Appendix~D authorship wording), rebuild the
+PDF, and push to the GitHub repository under an MIT license.
+\item (paraphrase, second review pass) Request to address a second pass
+of review items including Table~3 recomputation for $f^*\approx 9\e{-4}$,
+geometric-mean reporting, plateau-tolerance reassurance, figure upgrades
+to vector/$\ge 300$~dpi, and a spot-check justification for the cached
+pool results.
+\item (paraphrase, third review pass) Request to fix a final drift
+between the abstract and Table~3 ($\sim$10--$\sim$80 min, $4\e2$--$6\e4$),
+clarify the Table~3 caption labeling of measured vs extrapolated ranges,
+align Remark~2's citation with the main text, remove a duplicated word,
+and add explicit $n=2$ witnesses for Remark~1; plus a version number on
+the title page.
+\item (paraphrase, fourth revision pass for this version) Shorten the
+title, use the author's full name throughout, add references and a
+repository link to the abstract, sort the bibliography by first
+appearance, clarify the LSE$_j$ notation before its use in equation~(2),
+rewrite Contribution~1 to lead with the exact-vs-approx headline finding,
+move the 1-D quantile-map proposition into its own Preliminaries
+subsection, explain the seed convention, annotate the $r_i,t_j$ notation
+in the multi-robot protocol, justify the use of a dense bipartite solver
+(rather than Blossom~VI) in the application, reference Figure~3 in the
+text, remove the off-by-one entry from Limitations, add a Future Work
+section, cite Algorithm~1, fix the Table~4 ratio column rounding issue,
+clarify Algorithm~1's return value and termination condition, define the
+$D(z)$ notation in Algorithm~2, and confirm the column-marginal
+expression.
 \end{enumerate}
 
 \end{document}
