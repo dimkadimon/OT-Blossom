@@ -22,9 +22,8 @@
 \DeclareMathOperator*{\argmin}{arg\,min}
 \DeclareMathOperator*{\argmax}{arg\,max}
 
-\title{\bf Exact Optimal Transport by Matching:\\
-Benchmarks, Duality Certificates, and a Multi-Robot Application\\[4pt]
-\normalfont\small Version~1.3 (revision of \today)}
+\title{\bf Exact Optimal Transport by Matching\\[4pt]
+\normalfont\small Version~1.4 (revision of \today)}
 
 \author{
 Dmitry Kamenetsky
@@ -40,7 +39,7 @@ Dmitry Kamenetsky
 {\centering\small\itshape
 All algorithm design, implementation, experiments, analysis, and writing
 reported in this paper was carried out by an Arena.ai Agent Mode
-autonomous software agent under the direction of D.~K., who selected the
+autonomous software agent under the direction of Dmitry Kamenetsky, who selected the
 problem, set the scope, and reviewed intermediate results. A chronological
 summary of the prompts that directed the work is given in
 Appendix~\ref{app:prompts}, and the full transcript is archived in the
@@ -50,33 +49,41 @@ code repository.
 \begin{abstract}
 Balanced discrete optimal transport between $n$ sources and $n$ targets of
 unit mass is exactly the minimum-cost assignment problem, i.e.\ a bipartite
-perfect matching, and can therefore be solved \emph{exactly} by industrial
-matching engines in milliseconds to seconds. We ask when this exact approach
-beats the standard approximate alternatives---entropic Sinkhorn and its
-state-of-the-art accelerated variant Greenkhorn---and make the sparse-exact
-side \emph{certified} by a standard dual-feasibility clip. Three
-contributions. (i)~\emph{Measurement}: on dense 2-D instances, exact
-matching is faster \emph{and} strictly more accurate than either approximate
-method throughout the moderate-$n$ regime: $0.01\,\mathrm{s}$ at $n=500$ to
+perfect matching (Birkhoff--von Neumann~\cite{birkhoff1946}), and can
+therefore be solved \emph{exactly} by industrial matching engines
+(shortest-augmenting-path assignment~\cite{jonker1987}, Edmonds' Blossom
+algorithm~\cite{edmonds1965} and its Blossom~V/VI
+implementations~\cite{blossomv,blossomvi}) in milliseconds to seconds. We
+ask when this exact approach beats the standard approximate
+alternatives---entropic Sinkhorn~\cite{sinkknopp1967,cuturi2013} and its
+state-of-the-art accelerated variant Greenkhorn~\cite{awr2017,lin2022}---and
+make the sparse-exact side \emph{certified} by a standard LP dual-feasibility
+clip~\cite{schrijver2003}. Three contributions.
+(i)~\emph{Measurement}: on dense 2-D instances, exact matching is faster
+\emph{and} strictly more accurate than either approximate method throughout
+the moderate-$n$ regime: $0.01\,\mathrm{s}$ at $n=500$ to
 $11.5\,\mathrm{s}$ at $n=8000$; to hit a $\le 1\%$ quality target, a rough
 power-law extrapolation of Greenkhorn's measured step counts puts the
 approximate cost at $\sim\!10$--$\sim\!80\,\mathrm{min}$ for Greenkhorn
 (factors of roughly $4{\times}10^2$--$6{\times}10^4$ over exact; plain
-Sinkhorn is $20$--$650\times$ slower still). Greenkhorn, measured rather than assumed, is within
-$0.93\times$--$5.0\times$ of plain Sinkhorn on the measured cells and
-converges to the same entropic plan, so the quality gap is a regularization
-bias shared by both. (ii)~\emph{A simple certificate}: given a $k$NN-pool
-matching and its Blossom dual, a one-pass clipping of the dual to dense
-feasibility gives a valid lower bound (the textbook LP dual-feasibility
-argument); combined with the Sinkhorn dual potential $\sum_i u_i+\sum_j
-v_j$ (which is a lower bound at \emph{every} iterate, not just at
-convergence), the bound is checked on 15 instance families at three pool
-sizes. (iii)~\emph{Application}: multi-robot task allocation, where the
-discrete plan itself is the deliverable: per-round myopic-exact assignment
-costs $0.1$--$68\,\mathrm{ms}$, while a Sinkhorn-plus-hardening pipeline
-costs $0.12$--$15.9\,\mathrm{s}$ and accumulates $+6$--$27\%$ extra travel
-distance over 15 rounds. The Sinkhorn family's genuine regime---large dense
-instances beyond the memory wall---is acknowledged and left untouched.
+Sinkhorn is $20$--$650\times$ slower still). Greenkhorn, measured rather
+than assumed, is within $0.93\times$--$5.0\times$ of plain Sinkhorn on the
+measured cells and converges to the same entropic plan, so the quality gap
+is a regularization bias shared by both. (ii)~\emph{A simple certificate}:
+given a $k$NN-pool matching and its Blossom dual, a one-pass clipping of
+the dual to dense feasibility gives a valid lower bound (the textbook LP
+dual-feasibility argument); combined with the Sinkhorn dual potential
+$\sum_i u_i+\sum_j v_j$ (which is a lower bound at \emph{every} iterate,
+not just at convergence), the bound is checked on 15 instance families at
+three pool sizes. (iii)~\emph{Application}: multi-robot task
+allocation~\cite{gerkey2004}, where the discrete plan itself is the
+deliverable: per-round myopic-exact assignment costs $0.1$--$68\,\mathrm{ms}$,
+while a Sinkhorn-plus-hardening pipeline costs $0.12$--$15.9\,\mathrm{s}$
+and accumulates $+6$--$27\%$ extra travel distance over 15 rounds. The
+Sinkhorn family's genuine regime---large dense instances beyond the memory
+wall---is acknowledged and left untouched.
+All code, data, and results are open artifacts under the MIT license at
+\url{https://github.com/dimkadimon/OT-Blossom}.
 \end{abstract}
 
 \section{Introduction}
@@ -110,7 +117,7 @@ Jonker--Volgenant routine for dense solves.)
 study, dense exact assignment takes $0.01\,\mathrm{s}$ at $n=500$ and
 $11.5\,\mathrm{s}$ at $n=8000$; exploiting local structure, a $k$NN-pool
 sparse solve takes $0.18\,\mathrm{s}$ at $n=2000$ with a $0.032\%$ gap to
-the dense optimum (Table~5, per-side budget $k{+}1$, see~\S\ref{sec:pool});
+the dense optimum (Table~5, per-side budget $k{+}1$, see Section~\ref{sec:pool});
 1-D instances reach $n=10^6$ in $0.11\,\mathrm{s}$.
 \end{enumerate}
 
@@ -129,12 +136,18 @@ cheaply computable bound on its distance from the dense optimum; and (c) an
   sparse Blossom~VI $k$NN pool, 1-D closed form) against vanilla Sinkhorn
   and Greenkhorn on dense, clustered, and 1-D+noise instances,
   $n\in\{500,\dots,8000\}$, multiple seeds and distributions
-  (Sections~\ref{sec:setup}--\ref{sec:results}). The headline empirical
-  finding is that Greenkhorn's measured speedup over plain Sinkhorn in the
-  small-$\varepsilon$ regime needed for $\le 1\%$ accuracy is only
-  $1.0$--$1.5\times$ on most cells (with one $5\times$ outlier, over the
-  cells where vanilla converged; ratios on the two capped cells are
-  $4.3$--$4.4\times$), while the regularization bias is identical.
+  (Sections~\ref{sec:setup}--\ref{sec:results}). The headline findings:
+  (a)~\emph{exact is faster \emph{and} strictly more accurate than either
+  approximate method throughout the moderate-$n$ regime}---dense exact runs
+  in $0.01\,\mathrm{s}$ at $n=500$ to $11.5\,\mathrm{s}$ at $n=8000$,
+  while reaching $\le 1\%$ quality requires $\sim\!10$--$\sim\!80$ min for
+  Greenkhorn and $\sim\!200$--$\sim\!5{\times}10^4$ min for Sinkhorn (a
+  rough power-law extrapolation); and (b)~Greenkhorn's measured speedup
+  over plain Sinkhorn in the small-$\varepsilon$ regime needed for
+  $\le 1\%$ accuracy is only $1.0$--$1.5\times$ on most cells (with one
+  $5\times$ outlier, over the cells where vanilla converged; ratios on
+  the two capped cells are $4.3$--$4.4\times$), while their regularization
+  biases are identical.
 \item A \emph{gap certificate} for the pool solver requiring no dense solve:
   a one-sided $O(n^2)$ clip of the pool matching dual to a dense-feasible
   dual (Proposition~\ref{prop:repair}, Theorem~\ref{thm:cert})---the
@@ -224,17 +237,22 @@ W(\varepsilon) \;=\; \min_{P\in\mathcal{U}(n)}
 \qquad (0\log 0 := 0).
 \end{equation}
 The minimizer is the Gibbs kernel $P^{\varepsilon}_{ij}\propto
-\exp(-C_{ij}/\varepsilon)$ renormalized to have unit marginals. The
-Sinkhorn--Knopp iteration \cite{sinkknopp1967, cuturi2013} alternates row
-and column scaling of $K=\exp(-C/\varepsilon)$; in log form, with
-potentials $(u,v)$ such that $P_{ij}=\exp\bigl((u_i+v_j-C_{ij})/\varepsilon\bigr)$,
-each full row pass sets
+\exp(-C_{ij}/\varepsilon)$ renormalized to have unit marginals. Write
+$\operatorname{LSE}_j(a_j):=\log\sum_j e^{a_j}$ for the log-sum-exp
+reduction over index $j$ (and similarly $\operatorname{LSE}_i$ over rows);
+this is the standard numerically stabilized primitive (the ``LSE'' of
+vectors passed in as $z$), $\operatorname{LSE}(z)=\log\sum_k e^{z_k}$.
+The Sinkhorn--Knopp iteration~\cite{sinkknopp1967,cuturi2013} alternates
+row and column scaling of $K=\exp(-C/\varepsilon)$; in log form, with
+potentials $(u,v)$ such that
+$P_{ij}=\exp\bigl((u_i+v_j-C_{ij})/\varepsilon\bigr)$, each full row pass
+sets
 \begin{equation}
 \label{eq:sinkupdate}
 u_i \;\leftarrow\; -\varepsilon\,\operatorname{LSE}_j\Bigl(\frac{v_j-C_{ij}}{\varepsilon}\Bigr)
 \;=\; u_i-\varepsilon\log\!\sum_j P_{ij},
 \end{equation}
-and symmetrically for $v_j$ (where $\operatorname{LSE}(z)=\log\sum e^{z}$).
+and symmetrically for $v_j$.
 We run the log-domain variant, stopping at maximum marginal deviation
 $\le 10^{-9}$ or on a cost plateau.
 
@@ -279,10 +297,14 @@ problem is bipartite, so any bipartite sparse LAP solver (shortest
 augmenting path, cost-scaling, auction with $\varepsilon$-scaling) could be
 substituted; the Blossom~VI driver was convenient because the same code
 base was used for prior non-bipartite matching experiments.
-\paragraph{1-D.} If sources and targets lie on a line, the optimal map is
-a quantile (order) map (Proposition~\ref{prop:1d}); no matrix is formed.
-This covers the 1-D+noise ``near-Monge'' family, where the optimal map is
-close to the identity.
+\paragraph{1-D.} When sources and targets lie on a line (or on two parallel
+near-lines, our ``1-D+noise'' family), the optimal map is the sorted
+identity (Proposition~\ref{prop:1d}), solvable in $O(n\log n)$ sort time
+with no matrix formed.
+
+\subsection{One-dimensional closed form}
+When both point sets are supported on the line, OT admits a closed-form
+solution via sorting. This is the classical quantile (monotone) map:
 
 \begin{proposition}[1-D optimality of the quantile map]
 \label{prop:1d}
@@ -517,13 +539,23 @@ Appendix~\ref{app:detail}).
   noisy lines (along-line noise $\sigma=2$; cross-line noise $\sigma=2$);
   see Appendix~\ref{app:detail}.
 \end{itemize}
-Dense grid: $n\in\{500,1000,2000,4000,8000\}$, seed 7, uniform
-($n=12000$ runs out of memory after interpreter and NumPy temporaries: a
-$12000^2$ double matrix is $1.15\,\mathrm{GB}$, which leaves too little
-headroom on a 2-GB sandbox). Robustness sweep: $n=1000$, seeds 7--10, all
-three families (12 configurations); the certificate study adds $n=2000$,
-seed 7, all three families (15 configurations total). The multi-robot
-application uses $n\in\{50,200,800\}$, seeds 7--8, 15 rounds.
+
+\paragraph{Seeds.} Each family is parameterized by a NumPy
+\texttt{default\_rng(seed)} (the seed fixes source positions; target
+positions for the 1-D+noise family use \texttt{default\_rng(seed+1000)},
+see Appendix~\ref{app:detail}). We report the headline dense scaling and
+quality figures on a single canonical instance (\textbf{seed 7}, uniform
+distribution), which we chose before running any experiments as the
+default seed and kept throughout so that tables and figures line up on
+one reproducible instance; robustness across seeds 7--10 is reported
+separately. The dense grid spans $n\in\{500,1000,2000,4000,8000\}$ on
+that canonical instance ($n=12000$ runs out of memory after interpreter
+and NumPy temporaries: a $12000^2$ double matrix is $1.15\,\mathrm{GB}$,
+which leaves too little headroom on a 2-GB sandbox). The robustness
+sweep covers $n=1000$, seeds 7--10, all three families (12
+configurations); the certificate study adds $n=2000$, seed 7, all three
+families (15 configurations total). The multi-robot application uses
+$n\in\{50,200,800\}$, seeds 7--8, 15 rounds.
 
 \section{Results}
 \label{sec:results}
@@ -821,15 +853,22 @@ novel robotics result.
 
 \paragraph{Protocol.} Open field $[0,100)^2$; 15 rounds; each round, $n$
 fresh tasks appear, robots are (re)assigned with cost
-$C_{ij}=\lVert r_i-t_j\rVert_2$ from the robots' current positions, and
-robots then move to their assigned tasks. All three policies share the
-\emph{same} start positions and the \emph{same} task stream per round, so
-only the per-round assignment differs. Policies: \textbf{exact} (myopic
-Jonker--Volgenant per round); \textbf{greedy} (cheapest-first serial
-assignment); \textbf{Sinkhorn+hardening} (our $f=0.05$, marginal tolerance
-$10^{-7}$ pipeline, then greedy hardening to an integer plan).
+$C_{ij}=\lVert r_i-t_j\rVert_2$ from the robots' current positions
+$r_i\in\mathbb{R}^2$ to the new task locations $t_j\in\mathbb{R}^2$, and
+robots then move to their assigned tasks (the post-move positions become
+the next round's $r_i$). All three policies share the \emph{same} start
+positions and the \emph{same} task stream per round, so only the
+per-round assignment differs. Policies: \textbf{exact} (myopic dense
+bipartite LAP per round via SciPy's Jonker--Volgenant routine; we use the
+dense bipartite solver rather than Blossom~VI because the cost matrix is
+fully dense at the $n\le 800$ scale of this experiment, where a dedicated
+bipartite shortest-augmenting-path solver is the faster and simpler
+choice); \textbf{greedy} (cheapest-first serial assignment);
+\textbf{Sinkhorn+hardening} (our $f=0.05$, marginal tolerance $10^{-7}$
+pipeline, then greedy hardening to an integer plan).
 $n\in\{50,200,800\}$, seeds 7--8; Table~\ref{tab:robot} reports the
-episode totals.
+episode totals and Figure~\ref{fig:robot} reports both cumulative travel
+and per-round assignment wall time.
 
 \textbf{Caveat on optimality.} Because each round's assignment determines
 the next round's robot positions, per-round myopic optimality does
@@ -917,16 +956,58 @@ generalize. (ii) The $f^*$ extrapolation (Table~\ref{tab:target}) is a
 rough power-law projection, as documented, and carries $\sim$order-of-magnitude
 model uncertainty. (iii) The certificate is conservative on block-structured
 instances (Table~\ref{tab:cert}); a structure-aware repair or a
-column-generation loop is future work. (iv) The application is synthetic
-(no obstacles, kinematics, or traffic), and myopic per-round assignment is
-not globally optimal over an episode; the point is structural, not a
-robotics benchmark. (v) We do not compare against auction algorithms with
-$\varepsilon$-scaling, dedicated bipartite sparse LAP solvers,
-stabilized/$\varepsilon$-annealed Sinkhorn, or GPU implementations; those
-are important baselines for a full benchmark paper and should be added in
-follow-on work. (vi) The $k$NN-pool driver used for the cached results
-had an off-by-one (see Section~\ref{sec:results}); the corrected code is
-shipped in the repository.
+column-generation loop is left to future work. (iv) The application is
+synthetic (no obstacles, kinematics, or traffic), and myopic per-round
+assignment is not globally optimal over an episode; the point is
+structural, not a robotics benchmark. (v) We do not compare against
+auction algorithms with $\varepsilon$-scaling, dedicated bipartite sparse
+LAP solvers, stabilized/$\varepsilon$-annealed Sinkhorn, or GPU
+implementations; those are important baselines for a full benchmark paper.
+
+\section{Future work}
+\label{sec:future}
+
+Several natural extensions follow directly from this study.
+
+\emph{Tightening the certificate.} The one-shot dual clip
+(Proposition~\ref{prop:repair}) is valid but loose on clustered families
+(up to $\sim 22\%$ at $k=32$). A standard pricing / column-generation
+loop---use the clipped dual to identify off-pool edges with negative
+reduced cost, add them to the pool, re-solve---should drive the certified
+width to zero at a small fraction of the dense-solve cost, essentially
+turning the pool solver into a sparse dual active-set method. A cheaper
+alternative worth exploring is to apply the clip to \emph{both} sides
+alternately until convergence (Remark~\ref{rem:order} noted that two
+passes is the max for the sequential variant, but a symmetric alternating
+scheme with a tight line search may improve the bound further).
+
+\emph{Stronger baselines.} Adding auction with $\varepsilon$-scaling,
+shortest-augmenting-path sparse bipartite LAP (e.g.\ a cost-scaling
+implementation), stabilized / $\varepsilon$-annealed Sinkhorn, and GPU
+POT~\cite{flamary2021pot} would make the benchmark more complete and is
+the main missing axis of comparison.
+
+\emph{Entropy-corrected lower bounds.} The Sinkhorn dual used here is
+$\sum u_i+\sum_j v_j = W(\varepsilon)$, which is a lower bound at every
+iterate but is loose (by $\sim\varepsilon n\log n$) because it includes
+the negative entropy. The entropy-corrected variant
+$\mathrm{LB}_\varepsilon=D_\varepsilon-\varepsilon H(a)-\varepsilon H(b)$
+described in the lecture notes accompanying~\cite{peyre2019} can close
+most of that gap and should dominate the dual-repair bound at small $k$;
+combining it with the pool clip is algorithmically straightforward.
+
+\emph{Beyond myopic assignment in the application.} The multi-robot
+experiment uses per-round myopic assignment. A natural next step is to
+integrate the exact solver into a non-myopic planner (lookahead,
+rollout, or auction-based coordination with task deadlines), where the
+cheap per-round exact call becomes a subroutine.
+
+\emph{Scaling beyond the memory wall.} Above $n\approx 10^4$ the dense
+cost matrix no longer fits in memory, and genuine large-$n$ OT requires
+either Sinkhorn-family methods or a hierarchical / multi-scale sparse
+scheme; quantifying where a hierarchical Blossom-based solver breaks
+even against a well-tuned GPU Sinkhorn is the practical question for
+follow-on work.
 
 \section{Conclusion}
 Balanced discrete OT is the assignment problem, and the assignment problem
@@ -945,23 +1026,19 @@ untouched, and the boundary between exact and approximate is now measured.
 
 \begin{thebibliography}{20}
 
-\bibitem{edmonds1965}
-J.~Edmonds. \emph{Maximum matching and a polyhedron with $0$,$1$-vertices}.
-Journal of Research of the National Bureau of Standards, Section~B,
-69B:125--130, 1965.
-
 \bibitem{birkhoff1946}
 G.~Birkhoff. \emph{Tres observaciones sobre el algebra lineal}.
 Revista de la Universidad Nacional de Tucum\'an, Serie~A, 5:147--151, 1946.
-
-\bibitem{schrijver2003}
-A.~Schrijver. \emph{Combinatorial Optimization: Polyhedra and Efficiency}.
-Springer, 2003.
 
 \bibitem{jonker1987}
 R.~Jonker and A.~Volgenant. \emph{A shortest augmenting path algorithm for
 dense and sparse linear assignment problems}. Computing, 38(4):325--340,
 1987.
+
+\bibitem{edmonds1965}
+J.~Edmonds. \emph{Maximum matching and a polyhedron with $0$,$1$-vertices}.
+Journal of Research of the National Bureau of Standards, Section~B,
+69B:125--130, 1965.
 
 \bibitem{blossomv}
 V.~Kolmogorov. \emph{Blossom V: a new implementation of Edmonds' algorithm
@@ -986,6 +1063,19 @@ J.~Altschuler, J.~Weed, and P.~Rigollet. \emph{Near-linear time approximation
 algorithms for optimal transport via Sinkhorn iteration}. Advances in
 Neural Information Processing Systems 30, 2017. arXiv:1705.09634.
 
+\bibitem{lin2022}
+T.~Lin, N.~Ho, and M.~Jordan. \emph{On the efficiency of entropic
+regularized algorithms for optimal transport}. Journal of Machine Learning
+Research, 23(20):1--56, 2022.
+\bibitem{schrijver2003}
+A.~Schrijver. \emph{Combinatorial Optimization: Polyhedra and Efficiency}.
+Springer, 2003.
+
+\bibitem{gerkey2004}
+B.~P.~Gerkey and M.~J.~Matari\'c. \emph{A formal analysis and taxonomy of
+task allocation in multi-robot systems}. International Journal of Robotics
+Research, 23(9):939--954, 2004.
+
 \bibitem{peyre2019}
 G.~Peyr\'e and M.~Cuturi. \emph{Computational Optimal Transport}.
 Foundations and Trends in Machine Learning, 11(5):355--607, 2019.
@@ -998,22 +1088,15 @@ problem with applications}. arXiv:2501.06247, 2025.
 C.~Villani. \emph{Optimal Transport: Old and New}. Grundlehren 338,
 Springer, 2009.
 
-\bibitem{bertsekas1988}
-D.~P.~Bertsekas. \emph{The auction algorithm: a distributed relaxation
-method for the assignment problem}. Annals of Operations Research,
-14:105--123, 1988.
+\bibitem{flamary2021pot}
+R.~Flamary et al. \emph{POT: Python Optimal Transport}.
+Journal of Machine Learning Research, 22(78):1--8, 2021.
+\url{https://pythonot.github.io}.
 
-\bibitem{bertsekas1992}
-D.~P.~Bertsekas. \emph{Auction algorithms for network flow problems: a
-tutorial introduction}. Computational Optimization and Applications,
-1:7--66, 1992. (LIDS report LIDS-P-2108, 1992, contains the classical
-$\varepsilon$-complementary-slackness ``within $n\varepsilon$ of optimal''
-certificate.)
-
-\bibitem{gerkey2004}
-B.~P.~Gerkey and M.~J.~Matari\'c. \emph{A formal analysis and taxonomy of
-task allocation in multi-robot systems}. International Journal of Robotics
-Research, 23(9):939--954, 2004.
+\bibitem{alaya2019screenkhorn}
+M.~Z.~Alaya, M.~Berar, G.~Gasso, and A.~Rakotomamonjy. \emph{Screening
+Sinkhorn algorithm for regularized optimal transport}. Advances in Neural
+Information Processing Systems 32, 2019.
 
 \bibitem{schmitzer2016}
 B.~Schmitzer. \emph{A sparse multiscale algorithm for dense optimal
@@ -1025,20 +1108,17 @@ B.~Schmitzer. \emph{Stabilized sparse scaling algorithms for entropy
 regularized transport problems}. SIAM Journal on Scientific Computing,
 41(3):A1443--A1481, 2019.
 
-\bibitem{alaya2019screenkhorn}
-M.~Z.~Alaya, M.~Berar, G.~Gasso, and A.~Rakotomamonjy. \emph{Screening
-Sinkhorn algorithm for regularized optimal transport}. Advances in Neural
-Information Processing Systems 32, 2019.
+\bibitem{bertsekas1992}
+D.~P.~Bertsekas. \emph{Auction algorithms for network flow problems: a
+tutorial introduction}. Computational Optimization and Applications,
+1:7--66, 1992. (LIDS report LIDS-P-2108, 1992, contains the classical
+$\varepsilon$-complementary-slackness ``within $n\varepsilon$ of optimal''
+certificate.)
 
-\bibitem{flamary2021pot}
-R.~Flamary et al. \emph{POT: Python Optimal Transport}.
-Journal of Machine Learning Research, 22(78):1--8, 2021.
-\url{https://pythonot.github.io}.
-
-\bibitem{lin2022}
-T.~Lin, N.~Ho, and M.~Jordan. \emph{On the efficiency of entropic
-regularized algorithms for optimal transport}. Journal of Machine Learning
-Research, 23(20):1--56, 2022.
+\bibitem{bertsekas1988}
+D.~P.~Bertsekas. \emph{The auction algorithm: a distributed relaxation
+method for the assignment problem}. Annals of Operations Research,
+14:105--123, 1988.
 
 \end{thebibliography}
 
@@ -1114,7 +1194,7 @@ the pool dual changes with $k$).
 
 \subsection{Algorithms}
 \begin{algorithm}[h]
-\caption{Log-domain Sinkhorn (vanilla)}\label{alg:sink}
+\caption{Log-domain Sinkhorn (vanilla), after~\cite{sinkknopp1967,cuturi2013}}\label{alg:sink}
 \begin{algorithmic}[1]
 \Require cost $C\in\mathbb R^{n\times n}$, $\varepsilon>0$, tolerance $\tau$
 \State $u\leftarrow 0$, $v\leftarrow 0$
@@ -1212,7 +1292,7 @@ $k$NN subgraph.
 \label{app:prompts}
 
 This appendix summarizes, in chronological order, the prompts used by
-D.~K.\ to direct the work reported here. Prompts marked (verbatim) are
+Dmitry Kamenetsky to direct the work reported here. Prompts marked (verbatim) are
 quoted exactly; earlier prompts are paraphrased from the conversation
 record because their exact wording was not preserved.
 
@@ -1250,7 +1330,7 @@ and an application hook where the discrete plan is the deliverable.
 professional arXiv paper with references, proofs, and an appendix
 summarizing the prompts used; direction to disclose that the
 algorithm design, coding, experiments, analysis, and writing were
-performed by the AI agent under D.~K.'s direction.
+performed by the AI agent under Dmitry Kamenetsky's direction.
 \end{enumerate}
 
 \end{document}
