@@ -23,7 +23,7 @@
 \DeclareMathOperator*{\argmax}{arg\,max}
 
 \title{\bf Exact Optimal Transport by Matching\\[4pt]
-\normalfont\small Version~1.7 (revision of \today)}
+\normalfont\small Version~1.8 (revision of \today)}
 
 \author{
 Dmitry Kamenetsky
@@ -1458,20 +1458,42 @@ clarify the Table~3 caption labeling of measured vs extrapolated ranges,
 align Remark~2's citation with the main text, remove a duplicated word,
 and add explicit $n=2$ witnesses for Remark~1; plus a version number on
 the title page.
-\item (paraphrase, fourth revision pass for this version) Shorten the
-title, use the author's full name throughout, add references and a
-repository link to the abstract, sort the bibliography by first
-appearance, clarify the LSE$_j$ notation before its use in equation~(2),
-rewrite Contribution~1 to lead with the exact-vs-approx headline finding,
-move the 1-D quantile-map proposition into its own Preliminaries
-subsection, explain the seed convention, annotate the $r_i,t_j$ notation
-in the multi-robot protocol, justify the use of a dense bipartite solver
-(rather than Blossom~VI) in the application, reference Figure~3 in the
-text, remove the off-by-one entry from Limitations, add a Future Work
-section, cite Algorithm~1, fix the Table~4 ratio column rounding issue,
-clarify Algorithm~1's return value and termination condition, define the
-$D(z)$ notation in Algorithm~2, and confirm the column-marginal
-expression.
+\item (paraphrase, fourth revision pass) Shorten the title, use the
+author's full name throughout, add references and a repository link to
+the abstract, sort the bibliography by first appearance, clarify the
+LSE$_j$ notation before its use in equation~(2), rewrite Contribution~1
+to lead with the exact-vs-approx headline finding, move the 1-D
+quantile-map proposition into its own Preliminaries subsection, explain
+the seed convention, annotate the $r_i,t_j$ notation in the multi-robot
+protocol, justify the use of a dense bipartite solver (rather than
+Blossom~VI) in the application, reference Figure~3 in the text, remove
+the off-by-one entry from Limitations, add a Future Work section, cite
+Algorithm~1, fix the Table~4 ratio column rounding issue, clarify
+Algorithm~1's return value and termination condition, define the $D(z)$
+notation in Algorithm~2, and confirm the column-marginal expression.
+\item (paraphrase, fifth revision pass) Add space around the
+\texttt{gap$\approx$} symbol; explain why Figure~1's right panel
+appeared to top out at $\sim$8\% (add f=0.02 and f=0.05 curves, align
+the x-axis between panels, and note the 5.4--8.6\% range of f=0.01 in
+the caption); fix the orphan ``pool solve.'' line; define cost plateau
+explicitly; fix ``Section 4, Section 6'' to ``Sections 4 and 6'';
+correct the title and author on the GitHub repository README; add
+thin spaces between $\in$ and $\mathcal{U}/\mathbb{R}$; replace the
+``in the spirit of Crouse'' aside with a proper citation to Crouse
+(2016); swap the $\hat\alpha,\hat\beta$ order in Proposition~3 so the
+source-side clip is presented first; relabel vanilla Sinkhorn from (V)
+to (S) in Table~4; point readers at the cached JSON data files; add a
+sentence to Figure~3 explaining greedy's relative speedup at $n=800$;
+change ``$+17$--$+37$\%''/``$+6$--$+27$\%'' to ``$+17$ to $+37$\%''/
+``$+6$ to $+27$\%'' for readability; turn the empirical decision rule
+into a properly formatted table.
+\item (paraphrase, sixth revision pass) Improve the decision-rule
+table's readability (row separators, bold headers, extra vertical
+stretch); drop the stray ``$+$'' from ``$+6$--$27$\%''; boldface the
+zero vectors $\mathbf{0}$ in Algorithms 1 and 2 where potentials are
+initialized.
+\item (paraphrase, seventh revision pass) Add this and the previous
+round's prompts to Appendix~D.
 \end{enumerate}
 
 \end{document}
