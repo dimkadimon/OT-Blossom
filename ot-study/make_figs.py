@@ -13,12 +13,13 @@ RES = os.path.join(os.path.dirname(__file__), "results")
 # extrapolations to 1% gap target.
 # ---------------------------------------------------------------------------
 A = json.load(open(os.path.join(RES, "ot_study.json")))["A"]
-fit = json.load(open(os.path.join(RES, "ot_study.json")))["fit"]
-GA = json.load(open(os.path.join(RES, "ot-study", "results", "greenkhorn_A.json"))) if False else json.load(open(os.path.join(RES, "ot_study.json")))["GA"]
+GA = json.load(open(os.path.join(RES, "ot_study.json")))["GA"]
 
 ns = sorted(int(k) for k in A.keys() if k.isdigit())
 exact_t = [A[str(n)]["exact_t"] for n in ns]
-# Use f=0.01 (largest converged) Sinkhorn/Greenkhorn times
+# f=0.01 is the smallest f at which both methods converged on n=500 and n=1000.
+# At n=2000 neither f=0.01 nor f=0.005 converged within the 400 s cap, so we
+# only show the f=0.01 curve there as open markers to indicate the partial run.
 sink_t = []
 green_t = []
 for n in ns:
@@ -27,22 +28,15 @@ for n in ns:
     g = GA[str(n)].get("f0.0100", {}) if str(n) in GA else {}
     green_t.append(g.get("t", np.nan))
 
-# Rough extrapolation to 1% gap. Values are reported explicitly in
-# Table 3 of the paper (rounded to one or two significant figures). For
-# visual consistency the dashed extrapolation lines continue the
-# empirical log-log slope observed for f=0.01 on the measured points
-# (Sinkhorn ~n^1.9, Greenkhorn ~n^1.6), and star markers at each n
-# indicate the f* points from Table 3 (which additionally account for
-# extra iterations needed at smaller regularization). Convert to
-# seconds to match the measured-series units.
+# f* points (Table 3 of the paper). Dashed slope-continuation lines extend
+# from the largest measured f=0.01 point with the empirical log-log slope,
+# and star markers at each n indicate the f* points from Table 3.
 ns_arr = np.array(ns, dtype=float)
 mask_s = ~np.isnan(sink_t_arr := np.array(sink_t, dtype=float))
 mask_g = ~np.isnan(green_t_arr := np.array(green_t, dtype=float))
 slope_V = np.polyfit(np.log(ns_arr[mask_s]), np.log(sink_t_arr[mask_s]), 1)[0]
 slope_G = np.polyfit(np.log(ns_arr[mask_g]), np.log(green_t_arr[mask_g]), 1)[0]
 
-# Anchor the slope-continuation lines at the largest-n f=0.01 measured
-# point for each method and extend with the empirical slope.
 n_anchor_V, t_anchor_V = ns_arr[mask_s][-1], sink_t_arr[mask_s][-1]
 n_anchor_G, t_anchor_G = ns_arr[mask_g][-1], green_t_arr[mask_g][-1]
 ns_slope = np.array([n_anchor_V, 8000], dtype=float)
@@ -50,35 +44,59 @@ tV_slope = t_anchor_V * (ns_slope/n_anchor_V)**slope_V
 ns_slope_G = np.array([n_anchor_G, 8000], dtype=float)
 tG_slope = t_anchor_G * (ns_slope_G/n_anchor_G)**slope_G
 
-# f* points (Table 3)
 ns_ext = np.array([500,1000,2000,4000,8000], dtype=float)
 tG_ext = np.array([10, 12, 20, 40, 80], dtype=float) * 60.0       # seconds
 tV_ext = np.array([200, 700, 3000, 10000, 50000], dtype=float) * 60.0
 
+XLIM = (400, 10000)
+
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4.6))
 
 ax1.loglog(ns, exact_t, "o-", color="C2", lw=2, label="Exact (LAPJV)")
-ax1.loglog(ns, sink_t, "s-", color="C0", lw=2, label="Sinkhorn (f=0.01, gap 5–9%)")
-ax1.loglog(ns, green_t, "^-", color="C3", lw=2, label="Greenkhorn (f=0.01, gap 5–9%)")
+ax1.loglog(ns_arr[mask_s], sink_t_arr[mask_s], "s-", color="C0", lw=2,
+           label="Sinkhorn (f=0.01)")
+ax1.loglog(ns_arr[mask_g], green_t_arr[mask_g], "^-", color="C3", lw=2,
+           label="Greenkhorn (f=0.01)")
 ax1.loglog(ns_slope, tV_slope, "C0--", lw=1.2, alpha=0.6)
 ax1.loglog(ns_slope_G, tG_slope, "C3--", lw=1.2, alpha=0.6)
 ax1.loglog(ns_ext, tV_ext, "C0*", ms=10, label="Sinkhorn extrap. to 1%")
 ax1.loglog(ns_ext, tG_ext, "C3*", ms=10, label="Greenkhorn extrap. to 1%")
 ax1.set_xlabel("n"); ax1.set_ylabel("wall time (s)")
-ax1.set_title("Time (log-log)"); ax1.grid(True, which="both", alpha=0.3); ax1.legend(fontsize=7.5, loc="upper left")
+ax1.set_xlim(XLIM)
+ax1.set_title("Time (log-log)"); ax1.grid(True, which="both", alpha=0.3)
+ax1.legend(fontsize=7.5, loc="upper left")
 
-# Quality: gap vs n at f=0.01; include exact (gap=0)
-sink_gap = [A[str(n)].get("f0.0100", {}).get("gap", np.nan) for n in ns]
-green_gap = []
+# Quality: gap vs n. Solid lines are f=0.01 (gap 5.4% at n=500, 8.6% at n=1000;
+# at n=2000 f=0.01 did not converge within the 400 s cap). We additionally
+# plot f=0.02 and f=0.05 at all measured n to show how the gap grows with n
+# at fixed f, and to extend the x-axis to n=2000 on both panels.
+def gaps_for(fkey):
+    return [A[str(n)].get(fkey, {}).get("gap", np.nan) for n in ns]
+ax2.semilogx(ns, [0]*len(ns), "o-", color="C2", lw=2, label="Exact (0%)")
+# f=0.01
+g_s01 = gaps_for("f0.0100"); g_g01 = []
 for n in ns:
     g = GA[str(n)].get("f0.0100", {}) if str(n) in GA else {}
-    green_gap.append(g.get("gap", np.nan))
-ax2.semilogx(ns, [0]*len(ns), "o-", color="C2", lw=2, label="Exact (0%)")
-ax2.semilogx(ns, sink_gap, "s-", color="C0", lw=2, label="Sinkhorn (f=0.01)")
-ax2.semilogx(ns, green_gap, "^-", color="C3", lw=2, label="Greenkhorn (f=0.01)")
+    g_g01.append(g.get("gap", np.nan))
+msk = ~np.isnan(g_s01)
+ax2.semilogx(np.array(ns)[msk], np.array(g_s01)[msk], "s-", color="C0", lw=2,
+             label="Sinkhorn (f=0.01)")
+msk = ~np.isnan(g_g01)
+ax2.semilogx(np.array(ns)[msk], np.array(g_g01)[msk], "^-", color="C3", lw=2,
+             label="Greenkhorn (f=0.01)")
+# f=0.02
+g_s02 = gaps_for("f0.0200")
+ax2.semilogx(ns, g_s02, "s--", color="C0", lw=1.2, alpha=0.7,
+             label="Sinkhorn (f=0.02)")
+# f=0.05
+g_s05 = gaps_for("f0.0500")
+ax2.semilogx(ns, g_s05, "s:", color="C0", lw=1.0, alpha=0.55,
+             label="Sinkhorn (f=0.05)")
 ax2.axhline(1.0, ls=":", color="k", alpha=0.5, label="1% target")
 ax2.set_xlabel("n"); ax2.set_ylabel("gap to exact (%)")
-ax2.set_title("Quality (semi-log)"); ax2.grid(True, which="both", alpha=0.3); ax2.legend(fontsize=8, loc="upper left")
+ax2.set_xlim(XLIM)
+ax2.set_title("Quality (semi-log)"); ax2.grid(True, which="both", alpha=0.3)
+ax2.legend(fontsize=7.5, loc="upper left")
 
 plt.tight_layout()
 plt.savefig(os.path.join(OUT, "crossover.pdf"), dpi=300, bbox_inches="tight")

@@ -1,26 +1,28 @@
-# OT-Blossom: Exact Optimal Transport via the Blossom Algorithm
+# Exact Optimal Transport by Matching
 
 This repository contains the code, data, and paper source for
 
-> **Exact Optimal Transport via the Blossom Algorithm: Benchmarks, Duality
-> Certificates, and a Multi-Robot Application**
-> Dmitry Kamenetsky and AI Assistant (Arena.ai Agent Mode).
-> arXiv preprint, 2026.
+> **Exact Optimal Transport by Matching**
+> Dmitry Kamenetsky (with an Arena.ai Agent Mode autonomous software agent
+> directing the algorithm design, coding, experiments, analysis, and writing).
+> arXiv preprint, 2026. (Version 1.5.)
+
+The compiled paper PDF lives at [`paper/exact_ot_blossom.pdf`](paper/exact_ot_blossom.pdf).
 
 ## What it does
 
 Balanced discrete optimal transport between $n$ sources and $n$ targets of
-unit mass is exactly the minimum-cost assignment problem (a bipartite perfect
-matching). This repo benchmarks three ways of solving it:
+unit mass is exactly the minimum-cost assignment problem (a bipartite
+perfect matching). This repo benchmarks three ways of solving it:
 
 1. **Exact, dense** -- SciPy's Jonker--Volgenant `linear_sum_assignment`
-   ($\Theta(n^3)$ time, $O(n^2)$ memory).
+   (shortest-augmenting path; roughly cubic scaling empirically, $O(n^2)$ memory).
 2. **Exact, sparse** -- a $k$NN-pool solver using Blossom VI
    (Arkhipov & Kolmogorov, 2026) as the matching engine, plus a cheap
    dual-repair *gap certificate* that rigorously bounds distance from the
    dense optimum in one $O(n^2)$ pass.
 3. **Approximate** -- vanilla log-domain Sinkhorn and Greenkhorn (Altschuler,
-   Weed & Rigollet, 2017).
+   Weed & Rigollet, 2017; Lin, Ho & Jordan, 2022).
 
 It also contains a **multi-robot task allocation** demonstration where the
 discrete transport plan itself is the deliverable.
@@ -38,16 +40,21 @@ ot-study/
   otlib.py                  -- core library: exact (LAPJV, Blossom pool, 1-D
                               quantile map), Sinkhorn, Greenkhorn, dual repair,
                               entropic floor, combined certificate
-  run_ot_study.py           -- Part A/B benchmarks -> results/ot_study.md
-  run_greenkhorn_study.py   -- Greenkhorn-vs-Sinkhorn sweep -> results/ot_study.md
+  run_ot_study.py           -- Parts A/B benchmarks -> results/ot_study.json
+  run_greenkhorn_study.py   -- Greenkhorn-vs-Sinkhorn sweep -> results/
   run_pool_cert_study.py    -- 15-config x 3-k certificate study ->
-                              results/pool_cert.md (asserts invariants)
+                              results/pool_cert.json (asserts invariants)
   app_hook_robots.py        -- multi-robot task-allocation experiment ->
-                              results/app_hook.md
-  results/                  -- cached JSON outputs and rendered Markdown/figs
+                              results/app_hook.json
+  make_figs.py              -- regenerates paper/figs/*.pdf from cached JSON
+  verify_pool_ub.py         -- independent SciPy verification of pool UB costs
+  results/                  -- cached JSON outputs for all runs (all seeds,
+                              all families, all configurations reported
+                              in the paper); re-rendering scripts load these
 paper/
   exact_ot_blossom.tex      -- LaTeX source of the paper
-  figs/                     -- figures
+  exact_ot_blossom.pdf      -- compiled PDF
+  figs/                     -- figures (vector PDF + 200-dpi PNG)
 ```
 
 ## Requirements
@@ -69,21 +76,36 @@ python run_ot_study.py           # Parts A/B (dense exact + Sinkhorn grid)
 python run_greenkhorn_study.py   # Greenkhorn head-to-head
 python run_pool_cert_study.py    # 15x3 certificate study (needs Blossom VI)
 python app_hook_robots.py        # multi-robot application
+python make_figs.py              # regenerate paper/figs/ from cached JSON
 ```
 
-Each script caches results to JSON under `results/` and re-renders the
-Markdown reports in seconds on a re-run. A cold re-run takes roughly
-25 min (Greenkhorn grid), 20 min (certificate study), and 6 min
-(application hook) on the 2-core / 2-GB sandbox used in the paper.
+Each script caches results to JSON under `results/` and re-renders in
+seconds on a re-run. A cold re-run takes roughly 25 min (Greenkhorn grid),
+20 min (certificate study), and 6 min (application hook) on the 2-core /
+2-GB sandbox used in the paper.
+
+## Data
+
+All measured data reported in the paper is cached as JSON under
+[`ot-study/results/`](ot-study/results/):
+
+- `ot_study.json` -- dense exact times and vanilla Sinkhorn runs (Parts A/B).
+- `greenkhorn_A.json`, partial files -- Greenkhorn-vs-Sinkhorn head-to-head.
+- `pool_cert.json` -- 15 configurations $\times$ 3 pool sizes for the
+  certificate study (pool UB, repaired dual LB, entropic LB, true exact).
+- `app_hook.json` -- multi-robot episode totals and per-policy timings.
+
+Running the scripts with the cached JSON present reproduces every table
+and figure in seconds without needing Blossom VI.
 
 ## Certificate
 
-Given a pool matching with upper bound cost UB and Blossom duals $(\alpha, \beta)$,
-the lower bound is
+Given a pool matching with upper bound cost UB and Blossom duals
+$(\alpha, \beta)$, the lower bound is
 
 $$
-\hat\alpha_i = \min(\alpha_i, \min_j (C_{ij} - \beta_j)), \quad
-\hat\beta_j = \min(\beta_j, \min_i (C_{ij} - \alpha_i)),
+\hat\beta_j = \min(\beta_j, \min_i (C_{ij} - \alpha_i)), \quad
+\hat\alpha_i = \min(\alpha_i, \min_j (C_{ij} - \beta_j)),
 $$
 $$
 \mathrm{LB}_1 = \max\Big(\sum_i\alpha_i + \sum_j\hat\beta_j,\;
@@ -92,17 +114,17 @@ $$
 
 which satisfies $\mathrm{LB}_1 \le \mathrm{OPT} \le \mathrm{UB}$ without
 solving the dense problem (Proposition 3 / Theorem 1 of the paper). An
-entropic lower bound from a Sinkhorn run is combined as $\max(\mathrm{LB}_1,
-W(\varepsilon))$, though $\mathrm{LB}_1$ dominates everywhere we measured.
+entropic lower bound from a Sinkhorn run is combined as
+$\max(\mathrm{LB}_1, W(\varepsilon))$, though $\mathrm{LB}_1$ dominates
+everywhere we measured.
 
 ## Reproducing the paper
 
-Run the four scripts above to regenerate all JSON/Markdown outputs under
-`results/`. The paper's tables are transcribed from those Markdown reports;
-the figures under `paper/figs/` are generated by the scripts into
-`results/figs/` and copied to the paper tree. Compile
+Run the four scripts above to regenerate all JSON outputs under
+`results/`; then `python make_figs.py` regenerates the figures. Compile
 `paper/exact_ot_blossom.tex` with a standard LaTeX toolchain
-(`pdflatex + bibtex` is not needed; it uses a `thebibliography` environment).
+(`pdflatex`; BibTeX is not needed -- the paper uses a `thebibliography`
+environment).
 
 ## License
 
@@ -114,11 +136,12 @@ If you use this code or build on the certificate, please cite
 
 ```
 @misc{kamenetsky2026exact,
-  title={Exact Optimal Transport via the Blossom Algorithm: Benchmarks,
-         Duality Certificates, and a Multi-Robot Application},
-  author={Kamenetsky, Dmitry and AI Assistant},
-  year={2026},
-  note={Arena.ai Agent Mode (autonomous software agent);
-        source code: https://github.com/dimkadimon/OT-Blossom}
+  title={Exact Optimal Transport by Matching},
+  author={Kamenetsky, Dmitry},
+  note={Algorithm design, coding, experiments, analysis, and writing
+        carried out by an Arena.ai Agent Mode autonomous software agent
+        under the author's direction; Version 1.5, October 2026;
+        source code: https://github.com/dimkadimon/OT-Blossom},
+  year={2026}
 }
 ```

@@ -23,7 +23,7 @@
 \DeclareMathOperator*{\argmax}{arg\,max}
 
 \title{\bf Exact Optimal Transport by Matching\\[4pt]
-\normalfont\small Version~1.5 (revision of \today)}
+\normalfont\small Version~1.6 (revision of \today)}
 
 \author{
 Dmitry Kamenetsky
@@ -155,7 +155,7 @@ cheaply computable bound on its distance from the dense optimum; and (c) an
   Sinkhorn-dual potential lower bound, which holds at \emph{every} iterate
   (Theorem~\ref{thm:ent}). The certificate is valid on all $45$ measured
   cells and tightens monotonically in $k$ on every family
-  (Section~\ref{sec:cert}, Section~\ref{sec:results}).
+  (Sections~\ref{sec:cert} and~\ref{sec:results}).
 \item A multi-robot task-allocation experiment quantifying the ``discrete
   plan is the deliverable'' regime: myopic exact assignment is millisecond
   fast; the Sinkhorn pipeline is $10^2$--$10^3\times$ slower per round and
@@ -195,15 +195,15 @@ accompanying \cite{peyre2019}.\label{pg:clip}
 \label{sec:prelim}
 
 \subsection{Discrete OT as assignment}
-Let $C\in\mathbb{R}^{n\times n}_{\ge 0}$ be a cost matrix. Write
+Let $C\in \mathbb{R}^{n\times n}_{\ge 0}$ be a cost matrix. Write
 \[
-\mathcal{U}(n) \;=\; \{P\in\mathbb{R}^{n\times n}_{\ge 0} : P\mathbf{1}=\mathbf{1},\;
+\mathcal{U}(n) \;=\; \{P\in \mathbb{R}^{n\times n}_{\ge 0} : P\mathbf{1}=\mathbf{1},\;
 P^{\mathsf T}\mathbf{1}=\mathbf{1}\}
 \]
 for the set of feasible plans (each row and column sums to one; total mass
 $n$). The discrete transport problem is
 \[
-\operatorname{OPT}(C) \;=\; \min_{P\in\mathcal{U}(n)} \; \langle C,P\rangle
+\operatorname{OPT}(C) \;=\; \min_{P\in \mathcal{U}(n)} \; \langle C,P\rangle
 \;=\; \sum_{i,j} C_{ij}P_{ij}.
 \]
 We use the total-mass ($n$) convention throughout, so that at an optimum
@@ -232,29 +232,30 @@ graph with cost $\sum_i C_{i,\pi(i)}$, which proves the equivalence.
 For $\varepsilon>0$ define the regularized problem
 \begin{equation}
 \label{eq:weps}
-W(\varepsilon) \;=\; \min_{P\in\mathcal{U}(n)}
+W(\varepsilon) \;=\; \min_{P\in \mathcal{U}(n)}
 \bigl[\,\langle C,P\rangle \;+\; \varepsilon \sum_{ij} P_{ij}\log P_{ij}\,\bigr],
 \qquad (0\log 0 := 0).
 \end{equation}
 The minimizer is the Gibbs kernel $P^{\varepsilon}_{ij}\propto
-\exp(-C_{ij}/\varepsilon)$ renormalized to have unit marginals. Write
-$\operatorname{LSE}_j(a_j):=\log\sum_j e^{a_j}$ for the log-sum-exp
-reduction over index $j$ (and similarly $\operatorname{LSE}_i$ over rows);
-this is the standard numerically stabilized primitive (the ``LSE'' of
-vectors passed in as $z$), $\operatorname{LSE}(z)=\log\sum_k e^{z_k}$.
+\exp(-C_{ij}/\varepsilon)$ renormalized to have unit marginals.
 The Sinkhorn--Knopp iteration~\cite{sinkknopp1967,cuturi2013} alternates
 row and column scaling of $K=\exp(-C/\varepsilon)$; in log form, with
 potentials $(u,v)$ such that
-$P_{ij}=\exp\bigl((u_i+v_j-C_{ij})/\varepsilon\bigr)$, each full row pass
-sets
+$P_{ij}=\exp\bigl((u_i+v_j-C_{ij})/\varepsilon\bigr)$ (where
+$\operatorname{LSE}_j(a_j):=\log\sum_j e^{a_j}$ is the log-sum-exp
+reduction defined above), each full row pass sets
 \begin{equation}
 \label{eq:sinkupdate}
 u_i \;\leftarrow\; -\varepsilon\,\operatorname{LSE}_j\Bigl(\frac{v_j-C_{ij}}{\varepsilon}\Bigr)
 \;=\; u_i-\varepsilon\log\!\sum_j P_{ij},
 \end{equation}
-and symmetrically for $v_j$.
-We run the log-domain variant, stopping at maximum marginal deviation
-$\le 10^{-9}$ or on a cost plateau.
+and symmetrically for $v_j$
+(where $\operatorname{LSE}(z)=\log\sum_k e^{z_k}$ is the standard
+log-sum-exp primitive, and $\operatorname{LSE}_i,\operatorname{LSE}_j$
+denote reduction over the row and column index respectively).
+We run the log-domain variant, stopping when either the maximum marginal
+deviation falls below $10^{-9}$ or a cost plateau is detected (see
+Section~\ref{sec:approx}).
 
 \textbf{Two different quantities.} Equation~\eqref{eq:weps} matches the
 standard entropic-OT form used in \cite{cuturi2013,peyre2019}: with the
@@ -284,7 +285,9 @@ bound is from later work \cite{lin2022}.
 \subsection{Exact solvers used}
 \paragraph{Dense.} We use SciPy's optimized Jonker--Volgenant-style
 shortest-augmenting-path implementation \texttt{linear\_sum\_assignment}
-\cite{jonker1987} (a modified JV algorithm in the spirit of Crouse), with
+\cite{jonker1987} (the modified Jonker--Volgenant variant of Crouse
+\cite{crouse2016}, as used in SciPy's \texttt{linear\_sum\_assignment}),
+with
 empirical roughly-cubic scaling and $O(n^2)$ memory on dense inputs; see
 Section~\ref{sec:results}.
 \paragraph{Sparse pool.} For a pool $E_k\subseteq [n]\times[n]$ (the $k$
@@ -332,9 +335,13 @@ reduces the number of inversions and terminates at a non-crossing
 \label{sec:approx}
 
 Both approximate methods are implemented in the log domain (NumPy,
-single-threaded) and stopped at a marginal tolerance of $10^{-9}$ on the
-dense grid, or on a cost plateau at the coarser tolerances
-$10^{-6}$--$10^{-3}$ typical of Greenkhorn at small $f$. The regularization
+single-threaded) and stopped when either the maximum marginal deviation
+falls below $10^{-9}$ or a \emph{cost plateau} is detected, i.e.\ the
+transport cost $\langle C,P\rangle$ changes by less than $0.01\%$ over a
+sliding window of successive iterates. In practice Greenkhorn at small
+$f$ (small regularization) reaches such a plateau at marginal deviations
+of $10^{-6}$--$10^{-3}$, long before the $10^{-9}$ marginal tolerance is
+met. The regularization
 is parameterized as a fraction of the mean entry of the cost matrix,
 $f=\varepsilon/\overline{C}$ where $\overline{C}=n^{-2}\sum_{ij}C_{ij}$, on
 the grid $f\in\{0.05,0.02,0.01\}$ (plus $0.005$ at $n=500$).
@@ -382,20 +389,20 @@ bound on $\mathrm{OPT}$. The repair below fixes exactly that.
 \label{prop:repair}
 For any vectors $(\alpha,\beta)$ (no assumption required), define
 \[
-\hat\beta_j \;=\; \min\Bigl(\beta_j,\; \min_i \bigl[C_{ij}-\alpha_i\bigr]\Bigr),
+\hat\alpha_i \;=\; \min\Bigl(\alpha_i,\; \min_j \bigl[C_{ij}-\beta_j\bigr]\Bigr),
 \qquad
-\hat\alpha_i \;=\; \min\Bigl(\alpha_i,\; \min_j \bigl[C_{ij}-\beta_j\bigr]\Bigr).
+\hat\beta_j \;=\; \min\Bigl(\beta_j,\; \min_i \bigl[C_{ij}-\alpha_i\bigr]\Bigr).
 \]
-Then both $(\alpha,\hat\beta)$ and $(\hat\alpha,\beta)$ are dual-feasible
+Then both $(\hat\alpha,\beta)$ and $(\alpha,\hat\beta)$ are dual-feasible
 for the \emph{dense} assignment problem:
-$\alpha_i+\hat\beta_j\le C_{ij}$ and $\hat\alpha_i+\beta_j\le C_{ij}$ for
+$\hat\alpha_i+\beta_j\le C_{ij}$ and $\alpha_i+\hat\beta_j\le C_{ij}$ for
 \emph{all} $(i,j)\in[n]^2$.
 \end{proposition}
 \begin{proof}
 Fix any pair $(i,j)$. By definition,
-$\hat\beta_j\le C_{ij}-\alpha_i$, since $i$ is one of the indices over
+$\hat\alpha_i\le C_{ij}-\beta_j$, since $j$ is one of the indices over
 which the inner minimum is taken. Hence
-$\alpha_i+\hat\beta_j\le C_{ij}$ for all $(i,j)$. The second statement is
+$\hat\alpha_i+\beta_j\le C_{ij}$ for all $(i,j)$. The second statement is
 symmetric. $\square$
 \end{proof}
 
@@ -412,8 +419,8 @@ Let $\mathrm{UB}$ be the pool matching cost and set
 \begin{equation}
 \label{eq:lb1}
 \mathrm{LB}_1 \;=\; \max\Bigl(
-\textstyle\sum_i\alpha_i+\sum_j\hat\beta_j,\;\;
-\sum_i\hat\alpha_i+\sum_j\beta_j
+\textstyle\sum_i\hat\alpha_i+\sum_j\beta_j,\;\;
+\sum_i\alpha_i+\sum_j\hat\beta_j
 \Bigr).
 \end{equation}
 Then $\mathrm{LB}_1\le \mathrm{OPT}(C)\le \mathrm{UB}$, and the pool
@@ -440,24 +447,24 @@ The certificate can be loose; it is never wrong.
 
 \begin{remark}[Ordering of the repair]
 \label{rem:order}
-Let $A=(\alpha,\hat\beta)$ and $B=(\hat\alpha,\beta)$ be the two one-sided
+Let $A=(\hat\alpha,\beta)$ and $B=(\alpha,\hat\beta)$ be the two one-sided
 clips of Proposition~\ref{prop:repair}. A natural alternative is a
 sequential two-pass variant $S=(\hat\alpha,\tilde\beta)$: first clip $\alpha$
 against $\beta$ to get $\hat\alpha$, then clip $\beta$ against
 $\hat\alpha$. Because the second pass only lowers entries of $\beta$
 ($\tilde\beta_j\le\beta_j$), we have $\sum_i\hat\alpha_i+\sum_j\tilde\beta_j
 \le \sum_i\hat\alpha_i+\sum_j\beta_j$, so $S$ is \emph{always dominated}
-by $B$; it is incomparable with $A$, as explicit $n=2$ witnesses
+by $A$; it is incomparable with $B$, as explicit $n=2$ witnesses
 show. With $C=\bigl[\begin{smallmatrix}7&12\\13&2\end{smallmatrix}\bigr]$,
 $\alpha=(-10,9)$, $\beta=(14,7)$: one-sided repairs give
-$\hat\beta=(4,-7)$, $\hat\alpha=(-10,-5)$ with objectives $A=-4$, $B=6$,
-and a second clip leaves $\tilde\beta=(14,7)$ so $S=6>A$.
+$\hat\beta=(4,-7)$, $\hat\alpha=(-10,-5)$ with objectives $A=6$, $B=-4$,
+and a second clip leaves $\tilde\beta=(14,7)$ so $S=6>B$.
 With $C=\bigl[\begin{smallmatrix}17&6\\4&10\end{smallmatrix}\bigr]$,
 $\alpha=(16,15)$, $\beta=(15,-5)$:
-$\hat\beta=(-11,-10)$, $\hat\alpha=(2,-11)$ give $A=10$, $B=1$,
-and $S=1<A$. (Random trials on larger instances find $S>A$ and $S<A$
+$\hat\beta=(-11,-10)$, $\hat\alpha=(2,-11)$ give $A=1$, $B=10$,
+and $S=1<B$. (Random trials on larger instances find $S>B$ and $S<B$
 about equally often, $\approx 20\%$ each.) Since
-$\max(A,B)\ge B\ge S$, the max-of-two rule \eqref{eq:lb1} is never worse
+$\max(A,B)\ge A\ge S$, the max-of-two rule \eqref{eq:lb1} is never worse
 than the sequential variant while costing the same $O(n^2)$ work, and we
 use it throughout.
 Further alternating beyond two passes would only decrease the dual
@@ -619,10 +626,10 @@ rounded milliunit costs.}
 
 \paragraph{The $1\%$ target, rough extrapolation.}
 To reach a $1\%$ gap requires an $f^*$ in the range $\sim 10^{-3}$ (a
-no-intercept fit gap$\approx 1092 f$ on the three $n=500$ points gives
+no-intercept fit $\mathrm{gap} \approx 1092\,f$ on the three $n=500$ points gives
 $f^*\approx 9\times 10^{-4}$; an OLS fit \emph{with} intercept gives a
 slope of $1353$ and intercept $-9.8$, which yields $f^*\approx 8\times 10^{-3}$
-when forced through gap$\,=1$\% -- the two fits differ by an order of
+when forced through $\mathrm{gap}=1\%$ -- the two fits differ by an order of
 magnitude, which is itself a warning about extrapolation). A log-log linear
 fit to Greenkhorn's step count on the four $n=500$ plateau runs gives
 $1.241\times 10^4\,f^{-1.03}$; using the no-intercept slope $1092$ gives
@@ -683,7 +690,7 @@ modest.
 \small
 \begin{tabular}{rrrrrrrr}
 \toprule
-$n$ & $f$ & gap V \% & $t(V)$ s & gap G \% & $t(G)$ s & steps(G) & $t(V)/t(G)$ \\
+$n$ & $f$ & gap S \% & $t(S)$ s & gap G \% & $t(G)$ s & steps(G) & $t(S)/t(G)$ \\
 \midrule
 500  & 0.05 & +58.41 & 10  & +58.41 & 10 & 260k  & $0.93\times$ \\
 500  & 0.02 & +15.02 & 34  & +15.01 & 27 & 760k  & $1.26\times$ \\
@@ -696,7 +703,7 @@ $n$ & $f$ & gap V \% & $t(V)$ s & gap G \% & $t(G)$ s & steps(G) & $t(V)/t(G)$ \
 2000 & 0.02 & +43.78 & 400$^\dagger$ & +43.77 & 90 & 1.26M & $4.42\times$ \\
 \bottomrule
 \end{tabular}
-\caption{Vanilla Sinkhorn (V) vs Greenkhorn (G), uniform seed 7.
+\caption{Vanilla Sinkhorn (S) vs Greenkhorn (G), uniform seed 7.
 $^\dagger$ 400\,s cap (vanilla did not converge there). Times are rounded
 to integer seconds for display; speed ratios in the final column are
 computed from the unrounded wall times (so the $n=500,f=0.05$ row shows
@@ -790,12 +797,17 @@ cells carry $\mathrm{LB}>0$.}
 \centering
 \includegraphics[width=0.98\textwidth]{figs/crossover.png}
 \caption{Exact (Jonker--Volgenant) vs vanilla Sinkhorn and Greenkhorn on
-the dense uniform grid (seed~7). Solid lines are measured wall times at
-$f=0.01$ where each approximate method produces a transport plan $5$--$9\%$
-above the exact optimum. Dashed lines continue the empirical log-log
-slope of those measured curves; star markers are the rough Table~3
-extrapolation to the $1\%$ quality target. Exact is below both
-approximate curves at every measured $n$ in both time and quality.}
+the dense uniform grid (seed~7). Left: wall time (log-log); solid lines
+are measured points at $f=0.01$ (smallest regularization that converged
+on the measured grid), dashed lines continue the empirical log-log slope,
+and star markers are the rough Table~3 extrapolation to the $1\%$ quality
+target. Right: gap to exact (semi-log) at $f\in\{0.05,0.02,0.01\}$
+(Sinkhorn; Greenkhorn at $f=0.01$ overlaps the Sinkhorn curve to within
+line width); at $n=2000$ the $f=0.01$ runs did not converge within the
+400~s cap. At $f=0.01$ the gap ranges from $5.4\%$ at $n=500$ to $8.6\%$
+at $n=1000$, i.e.\ well above the $1\%$ target. Exact is below both
+approximate curves at every measured $n$ in both time and quality. Both
+panels share the same $n$-axis.}
 \label{fig:crossover}
 \end{figure}
 
@@ -823,10 +835,11 @@ certified escape hatch. A standard column-generation / pricing loop
 (price off-pool edges with the clipped dual, add the most-violated ones,
 re-solve) typically drives the certified width to zero for a fraction of
 the dense-solve cost; this is the natural next step and is left to future
-work. (iii)~\emph{Cost}: the clip itself is an $O(n^2)$ pass over the
-cost matrix and therefore has the same memory footprint as dense
+work.
+(iii)~\emph{Cost of the clip itself}: the repair is an $O(n^2)$ pass over
+the cost matrix and therefore has the same memory footprint as dense
 assignment; on our $n=2000$ cells it adds $\le 0.73\,\mathrm{s}$ to the
-pool solve.
+pool solve, which is small compared to the pool matching itself.
 
 \subsection{Robustness across seeds and distributions}
 On the 12-configuration $n=1000$ sweep (seeds 7--10 $\times$ families):
@@ -860,7 +873,7 @@ novel robotics result.
 \paragraph{Protocol.} Open field $[0,100)^2$; 15 rounds; each round, $n$
 fresh tasks appear, robots are (re)assigned with cost
 $C_{ij}=\lVert r_i-t_j\rVert_2$ from the robots' current positions
-$r_i\in\mathbb{R}^2$ to the new task locations $t_j\in\mathbb{R}^2$, and
+$r_i\in \mathbb{R}^2$ to the new task locations $t_j\in \mathbb{R}^2$, and
 robots then move to their assigned tasks (the post-move positions become
 the next round's $r_i$). All three policies share the \emph{same} start
 positions and the \emph{same} task stream per round, so only the
@@ -912,20 +925,28 @@ myopic-exact policy (see text for the global-optimality caveat).}
 \includegraphics[width=0.98\textwidth]{figs/app_hook.png}
 \caption{Left: episode travel distance vs $n$ (the quality tax compounds
 with $n$). Right: cost of the assignment step per round (log scale):
-exact matching is milliseconds; the Sinkhorn pipeline is $10^2$--$10^3\times$
-slower.}
+exact matching is $0.1$--$68$ ms/round; the Sinkhorn pipeline is
+$10^2$--$10^3\times$ slower. The greedy serial baseline is faster at
+large $n$ than its $O(n^2)$ worst case suggests because in practice its
+earlier picks remove the most-attractive edges cheaply; even so greedy
+remains $3$--$10\times$ slower than exact at every measured $n$ while
+producing a much worse plan.}
 \label{fig:robot}
 \end{figure}
 
 \paragraph{Findings.}
 (i)~\emph{The quality tax accumulates}: per-round gaps compound through
-robot positions; over 15 rounds greedy ends $+17$--$+37\%$ and
-Sinkhorn+hardening $+6$--$+27\%$ above the myopic-exact policy, and the
+robot positions; over 15 rounds greedy ends $+17$ to $+37\%$ and
+Sinkhorn+hardening $+6$ to $+27\%$ above the myopic-exact policy, and the
 gap grows with $n$. (ii)~\emph{Approximate is not even faster here}: the
 assignment step takes myopic-exact $0.1$--$68\,\mathrm{ms}$/round vs
 $0.12$--$15.9\,\mathrm{s}$ for the Sinkhorn pipeline ($\approx 239\times$
-at $n=800$). (iii)~\emph{The hook}: where a discrete integer plan is the
-deliverable, a Sinkhorn-plus-hardening pipeline is a tax on \emph{both}
+at $n=800$; see Figure~\ref{fig:robot}, right, for per-round timings of
+all three policies). Greedy is $8$--$10\times$ slower than exact at
+$n\le 200$ but only $\approx 3.5\times$ slower at $n=800$; even at that
+advantage it loses $35$--$37\%$ in travel distance.
+(iii)~\emph{The hook}: where a discrete integer plan is the deliverable,
+a Sinkhorn-plus-hardening pipeline is a tax on \emph{both}
 time and quality at $n\le 10^3$; an exact bipartite solver is the default
 choice, all the way up to the memory wall.
 
@@ -933,12 +954,47 @@ choice, all the way up to the memory wall.
 \label{sec:disc}
 
 \paragraph{Empirical decision rule.}
-Integer plan needed $\to$ exact; 1-D/Monge $\to$ closed form; local/$k$NN
-structure $\to$ sparse pool exact, \emph{with its certificate}
-(Section~\ref{sec:cert}); dense, no structure, fractional plan
-acceptable $\to$ exact up to the memory wall ($n\approx 1.2\times 10^4$
-on this hardware), beyond which well-tuned Sinkhorn-family
-implementations win on time and memory.
+Table~\ref{tab:decision} summarizes, in operational terms, which solver
+to reach for given problem structure on the regime studied here. These
+are empirical rules of thumb from our measurements (Sections
+\ref{sec:results}--\ref{sec:app}), not theorems; on production hardware
+with well-tuned libraries the break-even $n$ will shift, but the
+structural choices (integer plan $\to$ exact; 1-D $\to$ closed form;
+local structure $\to$ sparse pool with certificate) do not depend on the
+constants.
+
+\begin{table}[t]
+\centering\small
+\begin{tabular}{p{4.2cm}p{4.0cm}p{7.6cm}}
+\toprule
+Situation & Recommended solver & Why \\
+\midrule
+Integer plan required (MRTA, dispatch, matching per se)
+  & Dense exact (JV) or sparse pool + certificate
+  & Fractional plans are not physically realizable; hardening a
+    Sinkhorn plan adds $6$ to $37\%$ travel cost in our application
+    and is slower at $n\le 10^3$. \\
+1-D / near-Monge (sorted-order structure)
+  & Quantile (sort) map, Proposition~\ref{prop:1d}
+  & $O(n\log n)$ time, no matrix; scales to $n=10^6$ in $0.1$ s. \\
+Local / $k$NN structure (e.g.\ Euclidean geometry, moderate dim.)
+  & $k$NN-pool exact (Blossom~VI) + dual-repair certificate
+  & At $k=32$ the certificate is tight ($\le 0.7\%$) on uniform
+    instances; pool solve is sub-second. \\
+Dense, no structure, fractional plan acceptable, $n\lesssim 10^4$
+  & Dense exact (JV)
+  & Exact is milliseconds to seconds at this scale; Sinkhorn pays a
+    regularization tax and is $100$--$1000\times$ slower. \\
+Dense, fractional plan acceptable, $n\gg 10^4$ (past memory wall)
+  & Well-tuned Sinkhorn/Greenkhorn (POT, GPU)
+  & Dense matrix no longer fits; Sinkhorn runs in near-linear memory.
+    We do not benchmark this regime. \\
+\bottomrule
+\end{tabular}
+\caption{Empirical decision rule derived from the measurements in
+Sections~\ref{sec:results}--\ref{sec:app}.}
+\label{tab:decision}
+\end{table}
 
 \paragraph{What the certificate is, and what it is not.}
 The clip of Proposition~\ref{prop:repair} is a textbook dual projection,
@@ -1030,7 +1086,7 @@ where an integer plan is the deliverable, approximate OT is a tax on both
 time and quality. The Sinkhorn family's large-$n$ dense regime stands
 untouched, and the boundary between exact and approximate is now measured.
 
-\begin{thebibliography}{20}
+\begin{thebibliography}{21}
 
 \bibitem{birkhoff1946}
 G.~Birkhoff. \emph{Tres observaciones sobre el algebra lineal}.
@@ -1126,6 +1182,12 @@ D.~P.~Bertsekas. \emph{The auction algorithm: a distributed relaxation
 method for the assignment problem}. Annals of Operations Research,
 14:105--123, 1988.
 
+\bibitem{crouse2016}
+D.~F.~Crouse. \emph{On implementing 2D rectangular assignment algorithms}.
+IEEE Transactions on Aerospace and Electronic Systems, 52(4):1679--1696,
+2016. (The modified Jonker--Volgenant variant on which SciPy's
+\texttt{linear\_sum\_assignment} is based.)
+
 \end{thebibliography}
 
 \appendix
@@ -1207,7 +1269,7 @@ the pool dual changes with $k$).
 \begin{algorithm}[h]
 \caption{Log-domain Sinkhorn (vanilla), after~\cite{sinkknopp1967,cuturi2013}}\label{alg:sink}
 \begin{algorithmic}[1]
-\Require cost $C\in\mathbb R^{n\times n}$, $\varepsilon>0$, marginal
+\Require cost $C\in \mathbb R^{n\times n}$, $\varepsilon>0$, marginal
   tolerance $\tau$; terminate early on a cost plateau (see text).
 \State $u\leftarrow 0$, $v\leftarrow 0$
 \Repeat
@@ -1285,29 +1347,52 @@ process order, single run per cell.
 All code, data, and results are open artifacts under the MIT license,
 available at
 \url{https://github.com/dimkadimon/OT-Blossom}.
+
+\paragraph{Data availability.}
+All numerical results reported in this paper are shipped as cached JSON
+in \texttt{ot-study/results/} in the repository:
+\begin{itemize}[leftmargin=2em,itemsep=1pt]
+\item \texttt{ot\_study.json} -- dense exact times (seeds~7, $n\in\{500,1000,2000,4000,8000\}$) and vanilla Sinkhorn runs on the $f\times n$ grid
+  (uniform family, seeds 7--10 for the robustness sweep).
+\item \texttt{greenkhorn\_A.json} -- Greenkhorn head-to-head data for the
+  same $(n,f,seed)$ cells.
+\item \texttt{pool\_cert.json} -- full certificate study: 15
+  configurations (3 families $\times$ seeds 7--10 at $n=1000$, plus 3
+  families at $n=2000$ seed 7) $\times$ $k\in\{16,32,64\}$, with pool
+  upper bound, repaired-dual lower bound, entropic lower bound, exact
+  optimum, and per-cell timings.
+\item \texttt{app\_hook.json} -- multi-robot episode totals and
+  per-policy timings ($n\in\{50,200,800\}$, seeds 7--8, 15 rounds each).
+\end{itemize}
+Together these files contain every data point used in every table and
+figure. Re-running any script with these JSON files present reproduces
+the tables and figures in seconds without needing Blossom~VI; running a
+script with the JSON deleted triggers a cold re-run.
+
 The repository layout:
 \begin{verbatim}
 ot-study/otlib.py                  # exact (LAPJV, Blossom pool, 1-D),
                                    # sinkhorn, greenkhorn, dual repair, cert
-ot-study/run_ot_study.py           # Part A/B tables -> results/ot_study.md
+ot-study/run_ot_study.py           # Parts A/B tables -> results/
 ot-study/run_greenkhorn_study.py   # Greenkhorn-vs-Sinkhorn sweep
 ot-study/run_pool_cert_study.py    # 15-config x 3-k certificate study
 ot-study/app_hook_robots.py        # multi-robot task-allocation experiment
+ot-study/make_figs.py              # regenerate paper/figs from cached JSON
+ot-study/verify_pool_ub.py         # independent SciPy check of pool UBs
+ot-study/results/                  # cached JSON for all runs/seeds
 paper/                             # LaTeX source and figs for this paper
 \end{verbatim}
-Each script caches results (JSON) and re-renders in seconds; a full
-cold re-run takes $\approx 25\,\mathrm{min}$ (Greenkhorn grid),
+A full cold re-run takes $\approx 25\,\mathrm{min}$ (Greenkhorn grid),
 $\approx 20\,\mathrm{min}$ (certificate study), $\approx 6\,\mathrm{min}$
 (application hook) on the testbed. Dense exact, Sinkhorn/Greenkhorn,
 1-D, and application-hook scripts run on SciPy + NumPy alone. The
 pool-certificate script uses Blossom~VI's dual-output interface
 (\texttt{--duals} flag) and requires the Blossom~VI binary, which is
 available directly from its authors \cite{blossomvi} (it is not bundled
-with this repository); the cached JSON results in
-\texttt{ot-study/results/pool\_cert.json} are included so that tables
-and figures regenerate without it, and the pool upper-bound costs can
-be verified independently with any bipartite LAP solver on the same
-$k$NN subgraph.
+with this repository); the cached JSON results listed above are included
+so that tables and figures regenerate without it, and the pool
+upper-bound costs can be verified independently with any bipartite LAP
+solver on the same $k$NN subgraph (see \texttt{verify\_pool\_ub.py}).
 
 \section{Prompts that directed this work}
 \label{app:prompts}
