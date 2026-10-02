@@ -23,7 +23,7 @@
 \DeclareMathOperator*{\argmax}{arg\,max}
 
 \title{\bf Exact Optimal Transport by Matching\\[4pt]
-\normalfont\small Version~1.6 (revision of \today)}
+\normalfont\small Version~1.7 (revision of \today)}
 
 \author{
 Dmitry Kamenetsky
@@ -79,7 +79,7 @@ three pool sizes. (iii)~\emph{Application}: multi-robot task
 allocation~\cite{gerkey2004}, where the discrete plan itself is the
 deliverable: per-round myopic-exact assignment costs $0.1$--$68\,\mathrm{ms}$,
 while a Sinkhorn-plus-hardening pipeline costs $0.12$--$15.9\,\mathrm{s}$
-and accumulates $+6$--$27\%$ extra travel distance over 15 rounds. The
+and accumulates $6$--$27\%$ extra travel distance over 15 rounds. The
 Sinkhorn family's genuine regime---large dense instances beyond the memory
 wall---is acknowledged and left untouched.
 All code, data, and results are open artifacts under the MIT license at
@@ -937,7 +937,7 @@ producing a much worse plan.}
 \paragraph{Findings.}
 (i)~\emph{The quality tax accumulates}: per-round gaps compound through
 robot positions; over 15 rounds greedy ends $+17$ to $+37\%$ and
-Sinkhorn+hardening $+6$ to $+27\%$ above the myopic-exact policy, and the
+Sinkhorn+hardening $6$ to $27\%$ above the myopic-exact policy, and the
 gap grows with $n$. (ii)~\emph{Approximate is not even faster here}: the
 assignment step takes myopic-exact $0.1$--$68\,\mathrm{ms}$/round vs
 $0.12$--$15.9\,\mathrm{s}$ for the Sinkhorn pipeline ($\approx 239\times$
@@ -964,32 +964,36 @@ local structure $\to$ sparse pool with certificate) do not depend on the
 constants.
 
 \begin{table}[t]
-\centering\small
-\begin{tabular}{p{4.2cm}p{4.0cm}p{7.6cm}}
-\toprule
-Situation & Recommended solver & Why \\
-\midrule
+\centering\small\renewcommand{\arraystretch}{1.35}
+\begin{tabular}{p{3.9cm}p{3.7cm}p{8.0cm}}
+\hline\hline
+\textbf{Situation} & \textbf{Recommended solver} & \textbf{Why} \\
+\hline
 Integer plan required (MRTA, dispatch, matching per se)
   & Dense exact (JV) or sparse pool + certificate
   & Fractional plans are not physically realizable; hardening a
     Sinkhorn plan adds $6$ to $37\%$ travel cost in our application
     and is slower at $n\le 10^3$. \\
+\hline
 1-D / near-Monge (sorted-order structure)
   & Quantile (sort) map, Proposition~\ref{prop:1d}
   & $O(n\log n)$ time, no matrix; scales to $n=10^6$ in $0.1$ s. \\
+\hline
 Local / $k$NN structure (e.g.\ Euclidean geometry, moderate dim.)
   & $k$NN-pool exact (Blossom~VI) + dual-repair certificate
   & At $k=32$ the certificate is tight ($\le 0.7\%$) on uniform
     instances; pool solve is sub-second. \\
+\hline
 Dense, no structure, fractional plan acceptable, $n\lesssim 10^4$
   & Dense exact (JV)
   & Exact is milliseconds to seconds at this scale; Sinkhorn pays a
     regularization tax and is $100$--$1000\times$ slower. \\
+\hline
 Dense, fractional plan acceptable, $n\gg 10^4$ (past memory wall)
   & Well-tuned Sinkhorn/Greenkhorn (POT, GPU)
   & Dense matrix no longer fits; Sinkhorn runs in near-linear memory.
     We do not benchmark this regime. \\
-\bottomrule
+\hline\hline
 \end{tabular}
 \caption{Empirical decision rule derived from the measurements in
 Sections~\ref{sec:results}--\ref{sec:app}.}
@@ -1271,7 +1275,7 @@ the pool dual changes with $k$).
 \begin{algorithmic}[1]
 \Require cost $C\in \mathbb R^{n\times n}$, $\varepsilon>0$, marginal
   tolerance $\tau$; terminate early on a cost plateau (see text).
-\State $u\leftarrow 0$, $v\leftarrow 0$
+\State $u\leftarrow \mathbf{0}$, $v\leftarrow \mathbf{0}$\Comment{initialize all-zero potential vectors}
 \Repeat
   \For{$i=1,\dots,n$}\Comment{row pass}
     \State $u_i\;\leftarrow\; -\varepsilon\,\mathrm{LSE}_j\bigl((v_j-C_{ij})/\varepsilon\bigr)$
@@ -1293,7 +1297,7 @@ the pool dual changes with $k$).
 \caption{Greenkhorn (after \cite[Alg.~4]{awr2017})}\label{alg:green}
 \begin{algorithmic}[1]
 \Require $K=\exp(-C/\varepsilon)$ (unnormalized Gibbs kernel); potentials
-  $x,y\leftarrow 0$; residual metric $\rho(a,b)=b-a+a\log(a/b)$.
+  $x,y\leftarrow \mathbf{0}$; residual metric $\rho(a,b)=b-a+a\log(a/b)$.
   ($D(z)$ denotes the diagonal matrix with vector $z$ on the diagonal, so
   $A=D(e^x)\,K\,D(e^y)$ has entries
   $A_{ij}=e^{x_i}K_{ij}e^{y_j}=e^{(x_i+y_j-C_{ij})/\varepsilon}$;
