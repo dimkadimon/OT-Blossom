@@ -5,9 +5,11 @@ This repository contains the code, data, and paper source for
 > **Exact Optimal Transport by Matching**
 > Dmitry Kamenetsky (with an Arena.ai Agent Mode autonomous software agent
 > directing the algorithm design, coding, experiments, analysis, and writing).
-> arXiv preprint, 2026. (Version 1.5.)
+> arXiv:2610.04085, October 2026.
 
-The compiled paper PDF lives at [`paper/exact_ot_blossom.pdf`](paper/exact_ot_blossom.pdf).
+- **arXiv preprint:** <https://arxiv.org/abs/2610.04085>
+- **Compiled PDF in this repo:** [`paper/exact_ot_blossom.pdf`](paper/exact_ot_blossom.pdf)
+- **Source code repository:** <https://github.com/dimkadimon/OT-Blossom>
 
 ## What it does
 
@@ -54,14 +56,14 @@ ot-study/
 paper/
   exact_ot_blossom.tex      -- LaTeX source of the paper
   exact_ot_blossom.pdf      -- compiled PDF
-  figs/                     -- figures (vector PDF + 200-dpi PNG)
+  figs/                     -- figures (vector PDF)
 ```
 
 ## Requirements
 
 - Python $\ge$ 3.10 with `numpy`, `scipy`, `matplotlib`.
 - For the sparse $k$NN-pool solves you need a working **Blossom VI** binary
-  (P. Arkhipov & V. Kolmogorov, https://github.com/Paul566/blossom-vi,
+  (P. Arkhipov & V. Kolmogorov, <https://github.com/Paul566/blossom-vi>,
   arXiv:2604.20351). Our driver in `otlib.py` talks to it via a `tspkit`
   Python shim that loads the edge-list interface with the `--duals` flag;
   point the `TSPKIT` constant in `otlib.py` at your build. Dense exact,
@@ -130,18 +132,29 @@ environment).
 
 MIT. See `LICENSE`.
 
-## Citation
+## Citing
 
-If you use this code or build on the certificate, please cite
+If you use this code, the empirical findings, or the dual-repair
+certificate, please cite the arXiv preprint:
 
-```
+```bibtex
 @misc{kamenetsky2026exact,
-  title={Exact Optimal Transport by Matching},
-  author={Kamenetsky, Dmitry},
-  note={Algorithm design, coding, experiments, analysis, and writing
-        carried out by an Arena.ai Agent Mode autonomous software agent
-        under the author's direction; Version 1.5, October 2026;
-        source code: https://github.com/dimkadimon/OT-Blossom},
-  year={2026}
+  title         = {Exact Optimal Transport by Matching},
+  author        = {Kamenetsky, Dmitry},
+  year          = {2026},
+  eprint        = {2610.04085},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.DS},
+  url           = {https://arxiv.org/abs/2610.04085},
+  note          = {Algorithm design, implementation, experiments, analysis,
+                   and writing carried out by an Arena.ai Agent Mode
+                   autonomous software agent under the author's direction;
+                   source code: https://github.com/dimkadimon/OT-Blossom}
 }
 ```
+
+A plain-text reference for acknowledgements/footnote use:
+
+> Dmitry Kamenetsky. *Exact Optimal Transport by Matching.*
+> arXiv:2610.04085 [cs.DS], October 2026.
+> <https://arxiv.org/abs/2610.04085>
